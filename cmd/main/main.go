@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/GenM4/penguin/parser"
 	"os"
+
+	"github.com/GenM4/penguin/pkg/parser"
+	"github.com/GenM4/penguin/pkg/tokenizer"
 )
 
 func Check(e error) {
@@ -22,9 +24,24 @@ func main() {
 	dat, err := os.ReadFile(file)
 	Check(err)
 
+	fmt.Println("INPUT:")
+	fmt.Println(string(dat))
+	fmt.Println("")
+
+	tokens := tokenizer.Tokenize(dat)
+
+	fmt.Println("TOKENS:")
+	for _, token := range tokens {
+		if token.Data == "\n" {
+			fmt.Print("\\n\\", "\n")
+		} else {
+			fmt.Print(token.Data, "\t")
+		}
+	}
+	//fmt.Println(tokens)
+
 	for _, line := range dat {
 		parser.Parse(string(line))
-		fmt.Println(line)
 	}
 
 	return
