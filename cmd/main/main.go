@@ -38,10 +38,20 @@ func main() {
 			fmt.Print(token.Data, "\t")
 		}
 	}
-	//fmt.Println(tokens)
 
-	for _, line := range dat {
-		parser.Parse(string(line))
+	ASTRoot := parser.Parse(tokens)
+	fmt.Println("Program: " + ASTRoot.Data)
+
+	for _, stmt := range ASTRoot.Children {
+		fmt.Println("Statement: " + stmt.Data)
+		for _, expr := range stmt.Children {
+			fmt.Println("Expression: ")
+			fmt.Print("\t" + expr.Data + "\n")
+			for _, term := range expr.Children {
+				fmt.Print(term.Data + "\t\t")
+			}
+			fmt.Print("\n")
+		}
 	}
 
 	return

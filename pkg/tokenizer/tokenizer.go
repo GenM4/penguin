@@ -10,13 +10,27 @@ import (
 type TokenType int
 
 const (
-	exit TokenType = iota + 0
-	open_paren
-	close_paren
-	cr
-	operator
-	int_literal
+	Exit TokenType = iota + 0
+	Open_paren
+	Close_paren
+	CR
+	Operator_plus
+	Operator_minus
+	Operator_star
+	Operator_slash
+	Int_literal
 )
+
+var TokenDict = map[string]TokenType{
+	"exit": Exit,
+	"(":    Open_paren,
+	")":    Close_paren,
+	"\n":   CR,
+	"+":    Operator_plus,
+	"-":    Operator_minus,
+	"*":    Operator_star,
+	"/":    Operator_slash,
+}
 
 type Token struct {
 	Data string
@@ -24,22 +38,16 @@ type Token struct {
 }
 
 func matchToken(tokenAsString string) (TokenType, error) {
-	if tokenAsString == "exit" {
-		return exit, nil
-	} else if tokenAsString == "(" {
-		return open_paren, nil
-	} else if tokenAsString == ")" {
-		return close_paren, nil
-	} else if tokenAsString == "\n" {
-		return cr, nil
+	result, found := TokenDict[tokenAsString]
+	if found {
+		return result, nil
 	} else if tokenAsString != "" && unicode.IsDigit(rune(tokenAsString[0])) {
 		_, err := strconv.Atoi(tokenAsString)
 		Check(err)
-		return int_literal, nil
+		return Int_literal, nil
 	} else {
 		return -1, fmt.Errorf("Token Not Recognized: %v", tokenAsString)
 	}
-
 }
 
 func Tokenize(raw []byte) []Token {
@@ -51,7 +59,7 @@ func Tokenize(raw []byte) []Token {
 	for i := 0; i < len(fileContents); i++ {
 		buf := fileContents[last:i]
 
-		curr, err := View(fileContents, i)
+		curr, err := view(fileContents, i)
 		Check(err)
 
 		if curr == '(' {
@@ -98,7 +106,7 @@ func Check(e error) {
 	}
 }
 
-func View(str string, pos int) (rune, error) {
+func view(str string, pos int) (rune, error) {
 	if pos > len(str) {
 		return -1, errors.New("EOS")
 	}

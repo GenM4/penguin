@@ -1,2 +1,5 @@
-exit(15)
+exit(15 + 11)
+exit(22 - 11)
+exit(33 * 11)
+exit(44 / 11)
 exit(11)
