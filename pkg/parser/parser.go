@@ -90,11 +90,7 @@ func parseExpression(tokens []tokenizer.Token) (ASTNode, int, error) {
 			Data: tokens[start].Data,
 		}
 
-		tok, err := view(tokens[start+1:], 0)
-		if err != nil {
-			return ASTNode{}, start + 1, err
-		}
-
+		tok := view(tokens[start+1:], 0)
 		if tok.Kind == tokenizer.Operator_plus || tok.Kind == tokenizer.Operator_minus || tok.Kind == tokenizer.Operator_star || tok.Kind == tokenizer.Operator_slash {
 			op := ASTNode{
 				Kind: operator,
@@ -103,11 +99,7 @@ func parseExpression(tokens []tokenizer.Token) (ASTNode, int, error) {
 
 			op.Children = append(op.Children, term1)
 
-			_, err := view(tokens[start+2:], 0)
-			if err != nil {
-				return ASTNode{}, start + 2, err
-			}
-
+			view(tokens[start+2:], 0)
 			term2, numParsed, err := parseExpression(tokens[start+2:])
 			if err != nil {
 				return ASTNode{}, start + 2 + numParsed, err
@@ -124,11 +116,10 @@ func parseExpression(tokens []tokenizer.Token) (ASTNode, int, error) {
 	return ASTNode{}, start, errors.New("Unidentified expression: " + tokens[start].Data)
 }
 
-func view(tokens []tokenizer.Token, pos int) (tokenizer.Token, error) {
+func view(tokens []tokenizer.Token, pos int) tokenizer.Token {
 	if pos > len(tokens) {
-		err := errors.New("Attempted view outside of available tokens")
-		return tokenizer.Token{}, err
+		panic(errors.New("Attempted view outside of available tokens"))
 	}
 
-	return tokens[pos], nil
+	return tokens[pos]
 }

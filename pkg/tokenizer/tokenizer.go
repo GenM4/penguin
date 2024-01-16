@@ -59,9 +59,7 @@ func Tokenize(raw []byte) []Token {
 	for i := 0; i < len(fileContents); i++ {
 		buf := fileContents[last:i]
 
-		curr, err := view(fileContents, i)
-		Check(err)
-
+		curr := view(fileContents, i)
 		if curr == '(' {
 			result = pushToken(result, buf)
 			result = pushToken(result, "(")
@@ -106,10 +104,10 @@ func Check(e error) {
 	}
 }
 
-func view(str string, pos int) (rune, error) {
+func view(str string, pos int) rune {
 	if pos > len(str) {
-		return -1, errors.New("EOS")
+		panic(errors.New("Attempted view outside string"))
 	}
 
-	return rune(str[pos]), nil
+	return rune(str[pos])
 }
