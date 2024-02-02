@@ -35,7 +35,7 @@ func main() {
 	tokens := tokenizer.Tokenize(dat)
 
 	fmt.Println("TOKENS:")
-	for _, token := range tokens {
+	for _, token := range tokens.Tokens {
 		if token.Data == "\n" {
 			fmt.Print("\\n\\", "\n")
 		} else {
@@ -43,7 +43,7 @@ func main() {
 		}
 	}
 
-	ASTRoot := parser.Parse(tokens)
+	ASTRoot := parser.Parse(&tokens)
 	fmt.Println("Program: " + ASTRoot.Data)
 
 	for _, stmt := range ASTRoot.Children {
