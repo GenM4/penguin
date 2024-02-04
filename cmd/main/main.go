@@ -6,10 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 
 	"github.com/GenM4/penguin/pkg/generator"
 	"github.com/GenM4/penguin/pkg/parser"
 	"github.com/GenM4/penguin/pkg/tokenizer"
+
+	"github.com/m1gwings/treedrawer/tree"
 )
 
 func Check(e error) {
@@ -44,19 +47,47 @@ func main() {
 	}
 
 	ASTRoot := parser.Parse(&tokens)
-	fmt.Println("Program: " + ASTRoot.Data)
+	ASTRoot.Data = file
 
+	t := tree.NewTree(tree.NodeString("Prog: " + ASTRoot.Data))
 	for _, stmt := range ASTRoot.Children {
-		fmt.Println("Statement: " + stmt.Data)
+		stmtNode := t.AddChild(tree.NodeString("Stmt: " + stmt.Data))
 		for _, expr := range stmt.Children {
-			fmt.Println("Expression: ")
-			fmt.Print("\t" + expr.Data + "\n")
+			exprNode := stmtNode.AddChild(tree.NodeString(expr.Kind.String() + ": " + expr.Data + "\n" + "Prec: " + strconv.Itoa(expr.Precedence)))
 			for _, term := range expr.Children {
-				fmt.Print(term.Data + "\t\t")
+				var termNode *tree.Tree
+				if term.Precedence != -1 {
+					termNode = exprNode.AddChild(tree.NodeString(term.Kind.String() + ": " + term.Data + "\n" + "Prec: " + strconv.Itoa(term.Precedence)))
+				} else {
+					termNode = exprNode.AddChild(tree.NodeString(term.Data))
+				}
+				for _, term2 := range term.Children {
+					var term2Node *tree.Tree
+					if term2.Precedence != -1 {
+						term2Node = termNode.AddChild(tree.NodeString(term2.Kind.String() + ": " + term2.Data + "\n" + "Prec: " + strconv.Itoa(term2.Precedence)))
+					} else {
+						term2Node = termNode.AddChild(tree.NodeString(term2.Data))
+					}
+					for _, term3 := range term2.Children {
+						var term3Node *tree.Tree
+						if term3.Precedence != -1 {
+							term3Node = term2Node.AddChild(tree.NodeString(term3.Kind.String() + ": " + term3.Data + "\n" + "Prec: " + strconv.Itoa(term3.Precedence)))
+						} else {
+							term3Node = term2Node.AddChild(tree.NodeString(term3.Data))
+						}
+						for _, term4 := range term3.Children {
+							if term4.Precedence != -1 {
+								term3Node.AddChild(tree.NodeString(term4.Kind.String() + ": " + term4.Data + "\n" + "Prec: " + strconv.Itoa(term4.Precedence)))
+							} else {
+								term3Node.AddChild(tree.NodeString(term4.Data))
+							}
+						}
+					}
+				}
 			}
-			fmt.Print("\n")
 		}
 	}
+	fmt.Println(t)
 
 	srcFilepath := os.Args[len(os.Args)-1]
 	srcFilename := filepath.Base(srcFilepath)
