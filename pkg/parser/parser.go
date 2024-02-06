@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/GenM4/penguin/pkg/semantics"
 	"github.com/GenM4/penguin/pkg/tokenizer"
 )
 
@@ -13,6 +14,7 @@ type ASTNodeType int
 const (
 	Program ASTNodeType = iota + 0
 	Statement
+	Declaration
 	Expression
 	Term
 )
@@ -21,6 +23,8 @@ type ASTNode struct {
 	Kind       ASTNodeType
 	Data       string
 	Precedence int
+	Type       semantics.Type
+	Mutable    bool
 	Parent     *ASTNode
 	Children   []ASTNode
 }
@@ -29,6 +33,7 @@ func (nodeType ASTNodeType) String() string {
 	name := []string{
 		"Program",
 		"Statement",
+		"Declaration",
 		"Expression",
 		"Term",
 	}
@@ -50,8 +55,8 @@ func (node ASTNode) IsOperator() bool {
 	return false
 }
 
-func Parse(tokens *tokenizer.TokenStack) *ASTNode {
-	root, err := parseProgram(tokens)
+func Parse(tokens *tokenizer.TokenStack, vars *semantics.VarMap) *ASTNode {
+	root, err := parseProgram(tokens, vars)
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +64,7 @@ func Parse(tokens *tokenizer.TokenStack) *ASTNode {
 	return root
 }
 
-func parseProgram(tokens *tokenizer.TokenStack) (*ASTNode, error) {
+func parseProgram(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (*ASTNode, error) {
 	var node_Prog = ASTNode{
 		Kind: Program,
 	}
@@ -69,7 +74,7 @@ func parseProgram(tokens *tokenizer.TokenStack) (*ASTNode, error) {
 			tokens.Next()
 		}
 
-		stmt, err := parseStatement(tokens)
+		stmt, err := parseStatement(tokens, vars)
 		if err != nil {
 			return nil, err
 		}
@@ -81,9 +86,81 @@ func parseProgram(tokens *tokenizer.TokenStack) (*ASTNode, error) {
 	return &node_Prog, nil
 }
 
-func parseStatement(tokens *tokenizer.TokenStack) (ASTNode, error) {
-	if tokens.Top().Kind == tokenizer.Exit {
-		tokExitData := tokens.Top().Data
+func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNode, error) {
+	stmt := ASTNode{
+		Kind: Statement,
+	}
+
+	if tokens.Top().Kind == tokenizer.Mutable && tokens.Peek(1).Kind == tokenizer.Type {
+		if tokens.Peek(3).Kind == tokenizer.SingleEqual {
+			stmt.Data = tokens.Peek(3).Data
+
+			var decl *ASTNode
+			var err error
+
+			if tokens.Top().Data == "mut" {
+				tokens.Next()
+				decl, err = parseDeclaration(tokens, vars, true)
+				if err != nil {
+					return ASTNode{}, nil
+				}
+			} else if tokens.Top().Data == "const" {
+				tokens.Next()
+				decl, err = parseDeclaration(tokens, vars, false)
+				if err != nil {
+					return ASTNode{}, nil
+				}
+			} else {
+				return ASTNode{}, fmt.Errorf("Unrecognized mutable keyword: %v before %v", tokens.Top().Data, tokens.Next().Data)
+			}
+
+			tokens.Next()
+			tokens.Next()
+
+			expr, err := parseExpression(tokens, 0)
+			if err != nil {
+				return ASTNode{}, err
+			}
+
+			tokens.Next()
+			tokens.Next()
+
+			stmt.Children = append(stmt.Children, *decl)
+			stmt.Children = append(stmt.Children, *expr)
+
+			return stmt, nil
+		}
+	} else if tokens.Top().Kind == tokenizer.Type {
+		if tokens.Peek(2).Kind == tokenizer.SingleEqual {
+			stmt.Data = tokens.Peek(2).Data
+
+			var decl *ASTNode
+			var err error
+
+			decl, err = parseDeclaration(tokens, vars, false)
+			if err != nil {
+				return ASTNode{}, nil
+			}
+
+			tokens.Next()
+			tokens.Next()
+
+			expr, err := parseExpression(tokens, 0)
+			if err != nil {
+				return ASTNode{}, err
+			}
+
+			tokens.Next()
+			tokens.Next()
+
+			stmt.Children = append(stmt.Children, *decl)
+			stmt.Children = append(stmt.Children, *expr)
+
+			return stmt, nil
+		}
+
+	} else if tokens.Top().Kind == tokenizer.Exit {
+		stmt.Data = tokens.Top().Data
 
 		tokens.Next()
 		if tokens.Top().Kind == tokenizer.Open_paren {
@@ -104,11 +181,6 @@ func parseStatement(tokens *tokenizer.TokenStack) (ASTNode, error) {
 			return ASTNode{}, fmt.Errorf("Mismatched parens, expected ')' before %v", tokens.Top().Data)
 		}
 
-		var stmt = ASTNode{
-			Kind: Statement,
-			Data: tokExitData,
-		}
-
 		stmt.Children = append(stmt.Children, *expr)
 
 		return stmt, nil
@@ -117,10 +189,30 @@ func parseStatement(tokens *tokenizer.TokenStack) (ASTNode, error) {
 	return ASTNode{}, errors.New("Unrecognized token: " + tokens.Top().Data)
 }
 
+func parseDeclaration(tokens *tokenizer.TokenStack, vars *semantics.VarMap, mutable bool) (*ASTNode, error) {
+	decl := ASTNode{
+		Kind:    Declaration,
+		Mutable: mutable,
+	}
+
+	var err error
+	decl.Type, err = semantics.MatchType(tokens.Top().Data)
+	if err != nil {
+		return &ASTNode{}, err
+	}
+
+	tokens.Next()
+
+	decl.Data = tokens.Top().Data
+	(*vars)[decl.Data] = semantics.Variable{Mutable: decl.Mutable, Type: decl.Type}
+
+	return &decl, nil
+}
+
 func parseExpression(tokens *tokenizer.TokenStack, minPrec int) (*ASTNode, error) {
 	lhs, err := parseTerm(tokens)
 	if err != nil {
-		return nil, err
+		return &ASTNode{}, err
 	}
 	lookahead := tokens.Peek(1)
 
@@ -141,14 +233,14 @@ func parseExpression(tokens *tokenizer.TokenStack, minPrec int) (*ASTNode, error
 
 		rhs, err := parseTerm(tokens)
 		if err != nil {
-			return nil, err
+			return &ASTNode{}, err
 		}
 
 		lookahead = tokens.Peek(1)
 		for tokenizer.IsOperator(lookahead) && tokenizer.OperatorPrecedence(lookahead) > nextMinPrec {
 			rhs, err = parseExpression(tokens, nextMinPrec)
 			if err != nil {
-				return nil, err
+				return &ASTNode{}, err
 			}
 
 			if tokens.Top().Kind != tokenizer.Close_paren {
@@ -178,5 +270,5 @@ func parseTerm(tokens *tokenizer.TokenStack) (*ASTNode, error) {
 		}, nil
 	}
 
-	return nil, fmt.Errorf("Unrecognized term: %v", tokens.Top())
+	return &ASTNode{}, fmt.Errorf("Unrecognized term: %v", tokens.Top())
 }

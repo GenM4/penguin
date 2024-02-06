@@ -9,17 +9,27 @@ import (
 
 	"github.com/GenM4/penguin/pkg/generator"
 	"github.com/GenM4/penguin/pkg/parser"
+	"github.com/GenM4/penguin/pkg/semantics"
 	"github.com/GenM4/penguin/pkg/tokenizer"
 	"github.com/GenM4/penguin/pkg/utils/files"
 
 	"github.com/m1gwings/treedrawer/tree"
 )
 
+var PRINT_TOKEN_KINDS bool = false
+
 func main() {
 
 	dat := ReadSourceFile(os.Args[1])
 	tokens := TokenizeFile(dat)
-	ASTRoot := ParseTokens(tokens)
+
+	vars := make(semantics.VarMap)
+
+	ParseTokens(tokens, &vars)
+
+	printVarMap(&vars)
+
+	/*ASTRoot := ParseTokens(tokens, vars)
 
 	fileData := files.GenerateFilepaths(os.Args)
 	asmFile := files.OpenTargetFile(fileData.AsmFilepath)
@@ -28,7 +38,7 @@ func main() {
 
 	Assemble(fileData)
 	Link(fileData)
-
+	*/
 	return
 }
 
@@ -50,21 +60,13 @@ func ReadSourceFile(filepath string) []byte {
 
 func TokenizeFile(srcData []byte) tokenizer.TokenStack {
 	tokens := tokenizer.Tokenize(srcData)
-
-	fmt.Println("TOKENS:")
-	for _, token := range tokens.Tokens {
-		if token.Data == "\n" {
-			fmt.Print("\\n\\", "\n")
-		} else {
-			fmt.Print(token.Data, "\t")
-		}
-	}
+	printTokens(tokens, PRINT_TOKEN_KINDS)
 
 	return tokens
 }
 
-func ParseTokens(tokens tokenizer.TokenStack) *parser.ASTNode {
-	ASTRoot := parser.Parse(&tokens)
+func ParseTokens(tokens tokenizer.TokenStack, vars *semantics.VarMap) *parser.ASTNode {
+	ASTRoot := parser.Parse(&tokens, vars)
 	ASTRoot.Data = os.Args[1]
 	printAST(ASTRoot)
 
@@ -99,12 +101,34 @@ func Link(fileData files.FileData) {
 	log.Println("Completed linking to " + fileData.ExecFilepath)
 }
 
+func printTokens(tokens tokenizer.TokenStack, printKinds bool) {
+	fmt.Println("TOKENS:")
+	for _, token := range tokens.Tokens {
+		if token.Data == "\n" {
+			fmt.Print("\\n\\", "\n")
+		} else {
+			var kind string
+			if printKinds {
+				kind = token.Kind.String() + ":"
+			} else {
+				kind = ""
+			}
+			fmt.Print(kind+token.Data, "\t")
+		}
+	}
+}
+
 func printAST(ASTRoot *parser.ASTNode) {
 	t := tree.NewTree(tree.NodeString("Prog: " + ASTRoot.Data))
 	for _, stmt := range ASTRoot.Children {
 		stmtNode := t.AddChild(tree.NodeString("Stmt: " + stmt.Data))
 		for _, expr := range stmt.Children {
-			exprNode := stmtNode.AddChild(tree.NodeString(expr.Kind.String() + ": " + expr.Data + "\n" + "Prec: " + strconv.Itoa(expr.Precedence)))
+			var exprNode *tree.Tree
+			if expr.Kind == parser.Declaration {
+				exprNode = stmtNode.AddChild(tree.NodeString(expr.Kind.String() + ": " + expr.Data + "\n" + "Mutable: " + strconv.FormatBool(expr.Mutable) + "\n" + "Type: " + expr.Type.String()))
+			} else {
+				exprNode = stmtNode.AddChild(tree.NodeString(expr.Kind.String() + ": " + expr.Data + "\n" + "Prec: " + strconv.Itoa(expr.Precedence)))
+			}
 			for _, term := range expr.Children {
 				var termNode *tree.Tree
 				if term.Precedence != -1 {
@@ -139,4 +163,14 @@ func printAST(ASTRoot *parser.ASTNode) {
 		}
 	}
 	fmt.Println(t)
+}
+
+func printVarMap(vars *semantics.VarMap) {
+	fmt.Println("VARIABLE MAP: ")
+	for k, v := range *vars {
+		fmt.Print(k + ": ")
+		fmt.Print(v)
+		fmt.Print("\t")
+	}
+	fmt.Print("\n")
 }

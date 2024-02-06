@@ -21,11 +21,37 @@ const (
 	Operator_slash
 	Int_literal
 	Mutable
-	Const
 	Type
 	SingleEqual
 	Identifier
 )
+
+func (tokenType TokenType) String() string {
+	name := []string{
+		"Exit",
+		"Open_paren",
+		"Close_paren",
+		"CR",
+		"Plus",
+		"Minus",
+		"Star",
+		"Slash",
+		"Int_Literal",
+		"Mutable",
+		"Type",
+		"Equal",
+		"Identifier",
+	}
+
+	i := int(tokenType)
+	switch {
+	case i <= int(Identifier):
+		return name[i]
+	default:
+		return strconv.Itoa(i)
+	}
+
+}
 
 var TokenDict = map[string]TokenType{
 	"exit":  Exit,
@@ -37,7 +63,7 @@ var TokenDict = map[string]TokenType{
 	"*":     Operator_star,
 	"/":     Operator_slash,
 	"mut":   Mutable,
-	"const": Const,
+	"const": Mutable,
 	"int":   Type,
 	"=":     SingleEqual,
 }
