@@ -5,37 +5,51 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 
 	"github.com/GenM4/penguin/pkg/generator"
 	"github.com/GenM4/penguin/pkg/parser"
 	"github.com/GenM4/penguin/pkg/tokenizer"
+	"github.com/GenM4/penguin/pkg/utils/files"
 
 	"github.com/m1gwings/treedrawer/tree"
 )
 
-func Check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 func main() {
 
-	if os.Args[1] == "" {
-		return
+	dat := ReadSourceFile(os.Args[1])
+	tokens := TokenizeFile(dat)
+	ASTRoot := ParseTokens(tokens)
+
+	fileData := files.GenerateFilepaths(os.Args)
+	asmFile := files.OpenTargetFile(fileData.AsmFilepath)
+
+	GenerateAssembly(ASTRoot, asmFile, fileData.AsmFilepath)
+
+	Assemble(fileData)
+	Link(fileData)
+
+	return
+}
+
+func ReadSourceFile(filepath string) []byte {
+	if filepath == "" {
+		panic(fmt.Errorf("No source filepath provided"))
 	}
 
-	file := os.Args[1]
-	dat, err := os.ReadFile(file)
-	Check(err)
+	dat, err := os.ReadFile(filepath)
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("INPUT:")
 	fmt.Println(string(dat))
-	fmt.Println("")
 
-	tokens := tokenizer.Tokenize(dat)
+	return dat
+}
+
+func TokenizeFile(srcData []byte) tokenizer.TokenStack {
+	tokens := tokenizer.Tokenize(srcData)
 
 	fmt.Println("TOKENS:")
 	for _, token := range tokens.Tokens {
@@ -46,9 +60,46 @@ func main() {
 		}
 	}
 
-	ASTRoot := parser.Parse(&tokens)
-	ASTRoot.Data = file
+	return tokens
+}
 
+func ParseTokens(tokens tokenizer.TokenStack) *parser.ASTNode {
+	ASTRoot := parser.Parse(&tokens)
+	ASTRoot.Data = os.Args[1]
+	printAST(ASTRoot)
+
+	return ASTRoot
+}
+
+func GenerateAssembly(root *parser.ASTNode, file *os.File, filepath string) {
+	generator.Generate(root, file)
+	log.Println("Completed generating assembly to " + filepath)
+
+}
+
+func Assemble(fileData files.FileData) {
+	assembleCmd := exec.Command("nasm", "-felf64", fileData.AsmFilename)
+	assembleCmd.Dir = fileData.BaseFilepath
+	if err := assembleCmd.Run(); err != nil {
+		log.Println("Assembly Failed")
+		panic(err)
+	}
+
+	log.Println("Completed assembly to " + fileData.ObjFilepath)
+}
+
+func Link(fileData files.FileData) {
+	linkCmd := exec.Command("ld", fileData.ObjFilename, "-o", fileData.BaseFilename)
+	linkCmd.Dir = fileData.BaseFilepath
+	if err := linkCmd.Run(); err != nil {
+		log.Print("Linking Failed")
+		panic(err)
+	}
+
+	log.Println("Completed linking to " + fileData.ExecFilepath)
+}
+
+func printAST(ASTRoot *parser.ASTNode) {
 	t := tree.NewTree(tree.NodeString("Prog: " + ASTRoot.Data))
 	for _, stmt := range ASTRoot.Children {
 		stmtNode := t.AddChild(tree.NodeString("Stmt: " + stmt.Data))
@@ -88,53 +139,4 @@ func main() {
 		}
 	}
 	fmt.Println(t)
-
-	srcFilepath := os.Args[len(os.Args)-1]
-	srcFilename := filepath.Base(srcFilepath)
-	baseFilepath := filepath.Dir(srcFilepath)
-	baseFilename := removeFileExtension(srcFilename)
-	asmFilename := baseFilename + ".asm"
-	asmFilepath := filepath.Join(baseFilepath, asmFilename)
-	objFilename := baseFilename + ".o"
-	objFilepath := filepath.Join(baseFilepath, objFilename)
-	execFilepath := filepath.Join(baseFilepath, baseFilename)
-
-	asmFile, err := os.OpenFile(asmFilepath, os.O_CREATE|os.O_RDWR, 0755)
-	if err != nil {
-		panic(err)
-	}
-
-	log.Println("Opened file: " + asmFilepath)
-
-	if err = os.Truncate(asmFilepath, 0); err != nil {
-		panic(err)
-	}
-
-	generator.Generate(ASTRoot, asmFile)
-
-	log.Println("Completed generating assembly to " + asmFilepath)
-
-	assembleCmd := exec.Command("nasm", "-felf64", asmFilename)
-	assembleCmd.Dir = baseFilepath
-	if err = assembleCmd.Run(); err != nil {
-		log.Println("Assembly failed")
-		panic(err)
-	}
-
-	log.Println("Completed assembly to " + objFilepath)
-
-	linkCmd := exec.Command("ld", objFilename, "-o", baseFilename)
-	linkCmd.Dir = baseFilepath
-	if err = linkCmd.Run(); err != nil {
-		log.Print(err)
-		panic(err)
-	}
-
-	log.Println("Completed linking to " + execFilepath)
-
-	return
-}
-
-func removeFileExtension(filename string) string {
-	return filename[:len(filename)-len(filepath.Ext(filename))]
 }

@@ -2,7 +2,6 @@ package generator
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"os"
 
@@ -65,7 +64,6 @@ func genExpression(node parser.ASTNode, asmFile *os.File) error {
 	var parsedLHS, parsedRHS bool = false, false
 	if node.Kind == parser.Expression && len(node.Children) == 2 {
 		if node.Precedence <= node.Children[0].Precedence {
-			fmt.Println("LHS: " + node.Children[0].Data)
 			err := genExpression(node.Children[0], asmFile)
 			if err != nil {
 				return err
@@ -73,7 +71,6 @@ func genExpression(node parser.ASTNode, asmFile *os.File) error {
 			parsedLHS = true
 		}
 		if node.Precedence <= node.Children[1].Precedence {
-			fmt.Println("RHS: " + node.Children[1].Data)
 			err := genExpression(node.Children[1], asmFile)
 			if err != nil {
 				return err

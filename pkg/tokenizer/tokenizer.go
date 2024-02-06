@@ -20,17 +20,26 @@ const (
 	Operator_star
 	Operator_slash
 	Int_literal
+	Mutable
+	Const
+	Type
+	SingleEqual
+	Identifier
 )
 
 var TokenDict = map[string]TokenType{
-	"exit": Exit,
-	"(":    Open_paren,
-	")":    Close_paren,
-	"\n":   CR,
-	"+":    Operator_plus,
-	"-":    Operator_minus,
-	"*":    Operator_star,
-	"/":    Operator_slash,
+	"exit":  Exit,
+	"(":     Open_paren,
+	")":     Close_paren,
+	"\n":    CR,
+	"+":     Operator_plus,
+	"-":     Operator_minus,
+	"*":     Operator_star,
+	"/":     Operator_slash,
+	"mut":   Mutable,
+	"const": Const,
+	"int":   Type,
+	"=":     SingleEqual,
 }
 
 type Token struct {
@@ -119,7 +128,7 @@ func Tokenize(raw []byte) TokenStack {
 			i += strings.Index(fileContents[i:], "\n")
 			last = i + 1
 
-			if i == 0 {
+			if i == 0 { // EOF
 				break
 			}
 		} else if curr == '(' {
@@ -149,17 +158,25 @@ func matchToken(tokenAsString string) (TokenType, error) {
 		return result, nil
 	} else if tokenAsString != "" && unicode.IsDigit(rune(tokenAsString[0])) {
 		_, err := strconv.Atoi(tokenAsString)
-		Check(err)
+		if err != nil {
+			panic(err)
+		}
 		return Int_literal, nil
+	} else if isAlphabetic(tokenAsString) {
+		return Identifier, nil
 	} else {
 		return -1, fmt.Errorf("Token Not Recognized: %v", tokenAsString)
 	}
 }
 
-func Check(e error) {
-	if e != nil {
-		panic(e)
+func isAlphabetic(str string) bool {
+	for _, r := range str {
+		if !unicode.IsLetter(r) {
+			return false
+		}
 	}
+
+	return true
 }
 
 func view(str string, pos int) rune {
