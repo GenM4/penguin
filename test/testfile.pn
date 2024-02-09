@@ -1,3 +1,9 @@
-mut int abcd = 2 + 55
+mut int abcd = 22
 
-exit(11)
+const int dd = 30
+
+int fdf = 19
+
+const int da = 33
+
+exit(dd + abcd + 22)

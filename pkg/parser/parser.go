@@ -16,6 +16,7 @@ const (
 	Statement
 	Declaration
 	Expression
+	Identifier
 	Term
 )
 
@@ -35,6 +36,7 @@ func (nodeType ASTNodeType) String() string {
 		"Statement",
 		"Declaration",
 		"Expression",
+		"Identifier",
 		"Term",
 	}
 
@@ -204,7 +206,7 @@ func parseDeclaration(tokens *tokenizer.TokenStack, vars *semantics.VarMap, muta
 	tokens.Next()
 
 	decl.Data = tokens.Top().Data
-	(*vars)[decl.Data] = semantics.Variable{Mutable: decl.Mutable, Type: decl.Type}
+	(*vars)[decl.Data] = &semantics.Variable{Mutable: decl.Mutable, Type: decl.Type}
 
 	return &decl, nil
 }
@@ -266,6 +268,11 @@ func parseTerm(tokens *tokenizer.TokenStack) (*ASTNode, error) {
 	if tokens.Top().Kind == tokenizer.Int_literal {
 		return &ASTNode{
 			Kind: Term,
+			Data: tokens.Top().Data,
+		}, nil
+	} else if tokens.Top().Kind == tokenizer.Identifier {
+		return &ASTNode{
+			Kind: Identifier,
 			Data: tokens.Top().Data,
 		}, nil
 	}

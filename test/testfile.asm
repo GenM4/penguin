@@ -1,63 +1,23 @@
 global _start
 _start:
 	mov rax, 22
-	mov rbx, 11
-	sub rax, rbx
-	push rax
-	mov rax, 22
-	mov rbx, 1
-	div rbx
-	push rax
-	mov rax, 2
-	mov rbx, 6
-	mul rbx
-	push rax
-	pop rax, 
-	pop rbx, 
-	add rax, rbx
-	push rax
-	pop rax, 
-	pop rbx, 
-	add rax, rbx
-	push rax
-	mov rax, 60
-	pop rdi
-	syscall
-	mov rax, 4
-	mov rbx, 2
-	div rbx
-	push rax
-	pop rax, 
-	mov rbx, 3
-	add rax, rbx
-	push rax
-	pop rax, 
-	mov rbx, 6
-	add rax, rbx
-	push rax
-	mov rax, 60
-	pop rdi
-	syscall
+	push rax	;;1
+	mov rax, 30
+	push rax	;;2
+	mov rax, 19
+	push rax	;;3
 	mov rax, 33
-	mov rbx, 1
-	mul rbx
-	push rax
-	mov rax, 3
-	pop rbx, 
-	sub rax, rbx
-	push rax
-	mov rax, 60
-	pop rdi
-	syscall
-	mov rax, 44
-	mov rbx, 11
-	div rbx
-	push rax
-	mov rax, 60
-	pop rdi
-	syscall
-	mov rax, 11
-	push rax
+	push rax	;;4
+	push QWORD [rsp + 16]	;;5
+	pop rax
+	push QWORD [rsp + 24]	;;5
+	pop rbx
+	add rax, rbx
+	push rax	;;5
+	pop rax
+	mov rbx, 22
+	add rax, rbx
+	push rax	;;5
 	mov rax, 60
 	pop rdi
 	syscall

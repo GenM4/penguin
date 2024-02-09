@@ -25,20 +25,18 @@ func main() {
 
 	vars := make(semantics.VarMap)
 
-	ParseTokens(tokens, &vars)
+	ASTRoot := ParseTokens(tokens, &vars)
 
 	printVarMap(&vars)
-
-	/*ASTRoot := ParseTokens(tokens, vars)
 
 	fileData := files.GenerateFilepaths(os.Args)
 	asmFile := files.OpenTargetFile(fileData.AsmFilepath)
 
-	GenerateAssembly(ASTRoot, asmFile, fileData.AsmFilepath)
+	GenerateAssembly(ASTRoot, &vars, asmFile, fileData.AsmFilepath)
 
 	Assemble(fileData)
 	Link(fileData)
-	*/
+
 	return
 }
 
@@ -73,8 +71,8 @@ func ParseTokens(tokens tokenizer.TokenStack, vars *semantics.VarMap) *parser.AS
 	return ASTRoot
 }
 
-func GenerateAssembly(root *parser.ASTNode, file *os.File, filepath string) {
-	generator.Generate(root, file)
+func GenerateAssembly(root *parser.ASTNode, vars *semantics.VarMap, file *os.File, filepath string) {
+	generator.Generate(root, vars, file)
 	log.Println("Completed generating assembly to " + filepath)
 
 }
@@ -169,7 +167,7 @@ func printVarMap(vars *semantics.VarMap) {
 	fmt.Println("VARIABLE MAP: ")
 	for k, v := range *vars {
 		fmt.Print(k + ": ")
-		fmt.Print(v)
+		fmt.Print(*v)
 		fmt.Print("\t")
 	}
 	fmt.Print("\n")
