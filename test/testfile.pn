@@ -2,8 +2,6 @@ mut int abcd = 22
 
 const int dd = 30
 
-int fdf = 19
-
-const int da = 33
+abcd = 10
 
 exit(dd + abcd + 22)

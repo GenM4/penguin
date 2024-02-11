@@ -44,7 +44,10 @@ func traverseAST(node parser.ASTNode, genData *GeneratorData) error {
 	for _, child := range node.Children {
 		if child.Kind == parser.Statement {
 			log.Println("Generating assembly for statement: " + child.Data)
-			genStatement(child, genData)
+			err := genStatement(child, genData)
+			if err != nil {
+				return err
+			}
 		} else {
 			return errors.New("AST Node " + node.Kind.String() + "not implemented")
 		}
@@ -67,7 +70,13 @@ func genStatement(node parser.ASTNode, genData *GeneratorData) error {
 				return errors.New("Variable: " + node.Children[0].Data + " already declared")
 			}
 		} else if node.Children[0].Kind == parser.Identifier && node.Children[0].Mutable == true {
-			return errors.New("not implemented")
+			node.Children[1].Type = node.Children[0].Type
+			genAtom(node.Children[1], genData)
+
+			variable := (*genData.vars)[node.Children[0].Data]
+			word, _ := bytesToWord(variable.Type.Size())
+			genData.asmFile.WriteString("\tmov " + word + " [rsp + " + strconv.Itoa(8*(genData.stackPtrLocation-variable.StackLocation)) + "]" + ", rax\n")
+
 		} else {
 			return errors.New("Attempt to modify a const value: " + node.Children[0].Data)
 		}

@@ -4,20 +4,18 @@ _start:
 	push rax	;;1
 	mov rax, 30
 	push rax	;;2
-	mov rax, 19
-	push rax	;;3
-	mov rax, 33
-	push rax	;;4
-	push QWORD [rsp + 16]	;;5
+	mov rax, 10
+	mov QWORD [rsp + 8], rax
+	push QWORD [rsp + 0]	;;3
 	pop rax
-	push QWORD [rsp + 24]	;;5
+	push QWORD [rsp + 8]	;;3
 	pop rbx
 	add rax, rbx
-	push rax	;;5
+	push rax	;;3
 	pop rax
 	mov rbx, 22
 	add rax, rbx
-	push rax	;;5
+	push rax	;;3
 	mov rax, 60
 	pop rdi
 	syscall
