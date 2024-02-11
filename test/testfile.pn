@@ -1,7 +1,7 @@
-mut int abcd = 22
-
-const int dd = 30
-
-abcd = 10
-
-exit(dd + abcd + 22)
+mut int abcd = 11
+mut int rr = 4
+mut int c = 23
+abcd = rr + c
+abcd++
+abcd++
+exit(abcd)

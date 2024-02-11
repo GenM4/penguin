@@ -1,21 +1,34 @@
 global _start
 _start:
-	mov rax, 22
-	push rax	;;1
-	mov rax, 30
-	push rax	;;2
-	mov rax, 10
-	mov QWORD [rsp + 8], rax
-	push QWORD [rsp + 0]	;;3
+	mov rax, 11
+	push rax			;; Stack position: 1
+	mov rax, 4
+	push rax			;; Stack position: 2
+	mov rax, 23
+	push rax			;; Stack position: 3
+	push QWORD [rsp + 8]			;; Stack position: 4
 	pop rax
-	push QWORD [rsp + 8]	;;3
+	push QWORD [rsp + 0]			;; Stack position: 4
 	pop rbx
 	add rax, rbx
-	push rax	;;3
+	push rax			;; Stack position: 4
 	pop rax
-	mov rbx, 22
+	mov QWORD [rsp + 16], rax
+	push QWORD [rsp + 16]			;; Stack position: 4
+	pop rax
+	mov rbx, 1
 	add rax, rbx
-	push rax	;;3
+	push rax			;; Stack position: 4
+	pop rax
+	mov QWORD [rsp + 16], rax
+	push QWORD [rsp + 16]			;; Stack position: 4
+	pop rax
+	mov rbx, 1
+	add rax, rbx
+	push rax			;; Stack position: 4
+	pop rax
+	mov QWORD [rsp + 16], rax
+	push QWORD [rsp + 16]			;; Stack position: 4
 	mov rax, 60
 	pop rdi
 	syscall

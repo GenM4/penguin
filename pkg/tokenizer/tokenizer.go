@@ -19,6 +19,8 @@ const (
 	Operator_minus
 	Operator_star
 	Operator_slash
+	Operator_plusplus
+	Operator_minusminus
 	Int_literal
 	Mutable
 	Type
@@ -36,6 +38,8 @@ func (tokenType TokenType) String() string {
 		"Minus",
 		"Star",
 		"Slash",
+		"MinusMinus",
+		"PlusPlus",
 		"Int_Literal",
 		"Mutable",
 		"Type",
@@ -62,6 +66,8 @@ var TokenDict = map[string]TokenType{
 	"-":     Operator_minus,
 	"*":     Operator_star,
 	"/":     Operator_slash,
+	"++":    Operator_plusplus,
+	"--":    Operator_minusminus,
 	"mut":   Mutable,
 	"const": Mutable,
 	"int":   Type,
@@ -132,7 +138,9 @@ func IsOperator(tok Token) bool {
 	if tok.Kind == Operator_plus ||
 		tok.Kind == Operator_minus ||
 		tok.Kind == Operator_star ||
-		tok.Kind == Operator_slash {
+		tok.Kind == Operator_slash ||
+		tok.Kind == Operator_plusplus ||
+		tok.Kind == Operator_minusminus {
 		return true
 	}
 
@@ -157,6 +165,16 @@ func Tokenize(raw []byte) TokenStack {
 			if i == 0 { // EOF
 				break
 			}
+		} else if curr == '+' && view(fileContents, i+1) == '+' {
+			result = result.Append(buf)
+			result = result.Append("++")
+			last = i + 2
+			i = i + 1
+		} else if curr == '-' && view(fileContents, i+1) == '-' {
+			result = result.Append(buf)
+			result = result.Append("--")
+			last = i + 2
+			i = i + 1
 		} else if curr == '(' {
 			result = result.Append(buf)
 			result = result.Append("(")

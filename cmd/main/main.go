@@ -85,7 +85,7 @@ func Assemble(fileData files.FileData) {
 		panic(err)
 	}
 
-	log.Println("Completed assembly to " + fileData.ObjFilepath)
+	log.Println("Completed assembling to " + fileData.ObjFilepath)
 }
 
 func Link(fileData files.FileData) {
@@ -166,9 +166,12 @@ func printAST(ASTRoot *parser.ASTNode) {
 func printVarMap(vars *semantics.VarMap) {
 	fmt.Println("VARIABLE MAP: ")
 	for k, v := range *vars {
+		variable := *v
 		fmt.Print(k + ": ")
-		fmt.Print(*v)
+		fmt.Printf("%v ", variable.Mutable)
+		fmt.Printf("%v ", variable.Type.String())
+		fmt.Printf("%v ", variable.StackLocation)
 		fmt.Print("\t")
 	}
-	fmt.Print("\n")
+	fmt.Print("\n\n")
 }

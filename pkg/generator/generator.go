@@ -2,6 +2,7 @@ package generator
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -49,7 +50,7 @@ func traverseAST(node parser.ASTNode, genData *GeneratorData) error {
 				return err
 			}
 		} else {
-			return errors.New("AST Node " + node.Kind.String() + "not implemented")
+			return fmt.Errorf("AST Node '%v'", node.Kind.String())
 		}
 	}
 	return nil
@@ -62,25 +63,29 @@ func genStatement(node parser.ASTNode, genData *GeneratorData) error {
 				node.Children[1].Type = node.Children[0].Type
 
 				genAtom(node.Children[1], genData)
-
-				push("rax", variable.Type, genData)
 				variable.StackLocation = genData.stackPtrLocation
-
 			} else {
-				return errors.New("Variable: " + node.Children[0].Data + " already declared")
+				return fmt.Errorf("Variable: '%v' already declared", node.Children[0].Data)
 			}
 		} else if node.Children[0].Kind == parser.Identifier && node.Children[0].Mutable == true {
 			node.Children[1].Type = node.Children[0].Type
 			genAtom(node.Children[1], genData)
-
-			variable := (*genData.vars)[node.Children[0].Data]
-			word, _ := bytesToWord(variable.Type.Size())
-			genData.asmFile.WriteString("\tmov " + word + " [rsp + " + strconv.Itoa(8*(genData.stackPtrLocation-variable.StackLocation)) + "]" + ", rax\n")
-
+			pop("rax", node.Children[0].Type, genData)
+			reassign(node.Children[0], genData)
 		} else {
-			return errors.New("Attempt to modify a const value: " + node.Children[0].Data)
+			return fmt.Errorf("Attempt to modify a const value: '%v'", node.Children[0].Data)
 		}
 
+	} else if node.Data == "++" || node.Data == "--" {
+		expr := node.Children[0]
+
+		if expr.Children[0].Mutable == true {
+			genAtom(expr, genData)
+			pop("rax", node.Children[0].Type, genData)
+			reassign(expr.Children[0], genData)
+		} else {
+			return fmt.Errorf("Attempt to modify const value: '%v'", node.Children[0].Data)
+		}
 	} else if node.Data == "exit" {
 		genAtom(node.Children[0], genData)
 
@@ -193,21 +198,21 @@ func genTerm(node parser.ASTNode, genData *GeneratorData) error {
 	if err != nil {
 		return err
 	}
+
+	push("rax", node.Type, genData)
 	return nil
 }
 
 func genIdentifier(node parser.ASTNode, genData *GeneratorData) error {
 	if variable, ok := (*genData.vars)[node.Data]; ok {
-		word, _ := bytesToWord(variable.Type.Size())
+		word := bytesToWord(variable.Type.Size())
 		err := push(word+" [rsp + "+strconv.Itoa(8*(genData.stackPtrLocation-variable.StackLocation))+"]", variable.Type, genData)
 		if err != nil {
 			return err
 		}
-		return nil
-	} else {
-		return errors.New("Variable: " + node.Data + "not declared")
 	}
 
+	return fmt.Errorf("Variable: '%v' not declared", node.Data)
 }
 
 func genDefaultExit(asmFile *os.File) {
@@ -240,8 +245,17 @@ func prepBinaryExpressionCall(node parser.ASTNode, genData *GeneratorData) error
 	return err
 }
 
+func move(from string, to string, genData *GeneratorData) error {
+	_, err := genData.asmFile.WriteString("\tmov " + from + ", " + to + "\n")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func push(register string, dataType semantics.Type, genData *GeneratorData) error {
-	_, err := genData.asmFile.WriteString("\tpush " + register + "\t" + ";;" + strconv.Itoa(genData.stackPtrLocation) + "\n")
+	_, err := genData.asmFile.WriteString("\tpush " + register + "\t\t\t" + ";; Stack position: " + strconv.Itoa(genData.stackPtrLocation) + "\n")
 	if err != nil {
 		return err
 	}
@@ -262,11 +276,18 @@ func pop(register string, dataType semantics.Type, genData *GeneratorData) error
 	return nil
 }
 
-func bytesToWord(bytes int) (string, int) {
+func reassign(ident parser.ASTNode, genData *GeneratorData) error {
+	variable := (*genData.vars)[ident.Data]
+	word := bytesToWord(variable.Type.Size())
+	genData.asmFile.WriteString("\tmov " + word + " [rsp + " + strconv.Itoa(8*(genData.stackPtrLocation-variable.StackLocation)) + "]" + ", rax\n")
+	return nil
+}
+
+func bytesToWord(bytes int) string {
 	switch {
 	case bytes <= 2:
-		return "WORD", 0
+		return "WORD"
 	default:
-		return "QWORD", 0
+		return "QWORD"
 	}
 }
