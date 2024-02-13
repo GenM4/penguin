@@ -1,6 +1,6 @@
 global _start
 _start:
-	mov rax, 21h
+	mov rax, 51h
 	push rax			;; Stack position: 1
 	push QWORD [rsp + 0]			;; Stack position: 2
 	mov rax, 1

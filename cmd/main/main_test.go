@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"flag"
+	"log"
 	"os/exec"
 	"testing"
 )
@@ -24,9 +25,11 @@ func CompileProgram(t *testing.T) {
 func ExecuteProgram(t *testing.T) {
 	runExec := exec.Command("./testfile")
 	runExec.Dir = "../../test"
-	_, err := runExec.Output()
+	out, err := runExec.Output()
 	if err != nil {
 		t.Errorf("Program exited with %v, expected %v", err, *expected)
+	} else {
+		log.Print(string(out))
 	}
 
 }
