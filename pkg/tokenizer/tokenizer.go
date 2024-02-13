@@ -12,6 +12,7 @@ type TokenType int
 
 const (
 	Exit TokenType = iota + 0
+	Print
 	Open_paren
 	Close_paren
 	CR
@@ -31,6 +32,7 @@ const (
 func (tokenType TokenType) String() string {
 	name := []string{
 		"Exit",
+		"Print",
 		"Open_paren",
 		"Close_paren",
 		"CR",
@@ -59,6 +61,7 @@ func (tokenType TokenType) String() string {
 
 var TokenDict = map[string]TokenType{
 	"exit":  Exit,
+	"print": Print,
 	"(":     Open_paren,
 	")":     Close_paren,
 	"\n":    CR,

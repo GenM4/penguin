@@ -11,6 +11,77 @@ import (
 	"github.com/GenM4/penguin/pkg/semantics"
 )
 
+type OpCode int
+
+func (oc OpCode) String() string {
+	return strconv.Itoa(int(oc))
+}
+
+type IntLiteral int
+
+func (i IntLiteral) String() string {
+	return strconv.Itoa(int(i)) + "h"
+}
+
+type Register int
+
+const (
+	RAX Register = iota + 0
+	RBX
+	RCX
+	RDX
+	EDI
+	RSP
+	RSI
+	RDI
+)
+
+func (reg Register) String() string {
+	name := []string{
+		"rax",
+		"rbx",
+		"rcx",
+		"rdx",
+		"edi",
+		"rsp",
+		"rsi",
+		"rdi",
+	}
+
+	i := int(reg)
+	switch {
+	case i <= int(RDI):
+		return name[i]
+	default:
+		return strconv.Itoa(i)
+	}
+}
+
+type StackAddress struct {
+	Register Register
+	Offset   int
+	Size     string
+}
+
+func (sa StackAddress) String() string {
+	return sa.Size + " [" + sa.Register.String() + " + " + strconv.Itoa(8*sa.Offset) + "]"
+}
+
+type movable interface {
+	IntLiteral | OpCode | Register | StackAddress
+	String() string
+}
+
+type pushable interface {
+	Register | StackAddress
+	String() string
+}
+
+type popable interface {
+	Register | StackAddress
+	String() string
+}
+
 type GeneratorData struct {
 	asmFile          *os.File
 	stackPtrLocation int
@@ -30,18 +101,21 @@ func Generate(root *parser.ASTNode, vars *semantics.VarMap, out *os.File) {
 		panic(err)
 	}
 
-	err = traverseAST(*root, &genData)
+	err = genProgram(*root, &genData)
 	if err != nil {
 		genData.asmFile.Close()
 		panic(err)
 	}
 
-	genDefaultExit(genData.asmFile)
+	err = genDefaultExit(genData.asmFile, &genData)
+	if err != nil {
+		panic(err)
+	}
 
 	return
 }
 
-func traverseAST(node parser.ASTNode, genData *GeneratorData) error {
+func genProgram(node parser.ASTNode, genData *GeneratorData) error {
 	for _, child := range node.Children {
 		if child.Kind == parser.Statement {
 			log.Println("Generating assembly for statement: " + child.Data)
@@ -63,6 +137,7 @@ func genStatement(node parser.ASTNode, genData *GeneratorData) error {
 				node.Children[1].Type = node.Children[0].Type
 
 				genAtom(node.Children[1], genData)
+				push(RAX, node.Children[0].Type, genData)
 				variable.StackLocation = genData.stackPtrLocation
 			} else {
 				return fmt.Errorf("Variable: '%v' already declared", node.Children[0].Data)
@@ -70,7 +145,7 @@ func genStatement(node parser.ASTNode, genData *GeneratorData) error {
 		} else if node.Children[0].Kind == parser.Identifier && node.Children[0].Mutable == true {
 			node.Children[1].Type = node.Children[0].Type
 			genAtom(node.Children[1], genData)
-			pop("rax", node.Children[0].Type, genData)
+			pop(RAX, node.Children[0].Type, genData)
 			reassign(node.Children[0], genData)
 		} else {
 			return fmt.Errorf("Attempt to modify a const value: '%v'", node.Children[0].Data)
@@ -81,16 +156,23 @@ func genStatement(node parser.ASTNode, genData *GeneratorData) error {
 
 		if expr.Children[0].Mutable == true {
 			genAtom(expr, genData)
-			pop("rax", node.Children[0].Type, genData)
+			pop(RAX, node.Children[0].Type, genData)
 			reassign(expr.Children[0], genData)
 		} else {
 			return fmt.Errorf("Attempt to modify const value: '%v'", node.Children[0].Data)
 		}
+	} else if node.Data == "print" {
+		genAtom(node.Children[0], genData)
+		move(RAX, OpCode(1), genData)
+		move(RDI, OpCode(1), genData)
+		move(RSI, RSP, genData)
+		move(RDX, OpCode(1), genData)
+		genData.asmFile.WriteString("\tsyscall\n")
 	} else if node.Data == "exit" {
 		genAtom(node.Children[0], genData)
 
-		genData.asmFile.WriteString("\tmov rax, 60\n")
-		genData.asmFile.WriteString("\tpop rdi\n")
+		move(RAX, OpCode(60), genData)
+		pop(RDI, node.Children[0].Type, genData)
 		genData.asmFile.WriteString("\tsyscall\n")
 	}
 	return nil
@@ -101,7 +183,7 @@ func genAtom(node parser.ASTNode, genData *GeneratorData) error {
 	if node.Kind == parser.Expression && len(node.Children) == 2 {
 		err = genExpression(node, genData)
 	} else if node.Kind == parser.Term {
-		err = genTerm(node, genData)
+		err = genTerm(RAX, node, genData)
 	} else if node.Kind == parser.Identifier {
 		err = genIdentifier(node, genData)
 	}
@@ -157,7 +239,7 @@ func genBinaryExpression(node parser.ASTNode, genData *GeneratorData) error {
 	case node.Data == "+":
 		err := prepBinaryExpressionCall(node, genData)
 		_, err = genData.asmFile.WriteString("\tadd rax, rbx" + "\n")
-		err = push("rax", node.Type, genData)
+		err = push(RAX, node.Type, genData)
 
 		if err != nil {
 			return err
@@ -165,7 +247,7 @@ func genBinaryExpression(node parser.ASTNode, genData *GeneratorData) error {
 	case node.Data == "-":
 		err := prepBinaryExpressionCall(node, genData)
 		_, err = genData.asmFile.WriteString("\tsub rax, rbx" + "\n")
-		err = push("rax", node.Type, genData)
+		err = push(RAX, node.Type, genData)
 
 		if err != nil {
 			return err
@@ -173,7 +255,7 @@ func genBinaryExpression(node parser.ASTNode, genData *GeneratorData) error {
 	case node.Data == "*":
 		err := prepBinaryExpressionCall(node, genData)
 		_, err = genData.asmFile.WriteString("\tmul rbx" + "\n")
-		err = push("rax", node.Type, genData)
+		err = push(RAX, node.Type, genData)
 
 		if err != nil {
 			return err
@@ -181,7 +263,7 @@ func genBinaryExpression(node parser.ASTNode, genData *GeneratorData) error {
 	case node.Data == "/":
 		err := prepBinaryExpressionCall(node, genData)
 		_, err = genData.asmFile.WriteString("\tdiv rbx" + "\n")
-		err = push("rax", node.Type, genData)
+		err = push(RAX, node.Type, genData)
 
 		if err != nil {
 			return err
@@ -193,20 +275,30 @@ func genBinaryExpression(node parser.ASTNode, genData *GeneratorData) error {
 	return nil
 }
 
-func genTerm(node parser.ASTNode, genData *GeneratorData) error {
-	_, err := genData.asmFile.WriteString("\tmov rax, " + node.Data + "\n")
+func genTerm(register Register, node parser.ASTNode, genData *GeneratorData) error {
+	data, err := strconv.Atoi(node.Data)
 	if err != nil {
 		return err
 	}
 
-	push("rax", node.Type, genData)
+	err = move(register, IntLiteral(data), genData)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func genIdentifier(node parser.ASTNode, genData *GeneratorData) error {
 	if variable, ok := (*genData.vars)[node.Data]; ok {
-		word := bytesToWord(variable.Type.Size())
-		err := push(word+" [rsp + "+strconv.Itoa(8*(genData.stackPtrLocation-variable.StackLocation))+"]", variable.Type, genData)
+		offset := genData.stackPtrLocation - variable.StackLocation
+		var addr = StackAddress{
+			Register: RSP,
+			Offset:   offset,
+			Size:     bytesToWord(variable.Type.Size()),
+		}
+
+		err := push(addr, variable.Type, genData)
 		if err != nil {
 			return err
 		}
@@ -215,38 +307,44 @@ func genIdentifier(node parser.ASTNode, genData *GeneratorData) error {
 	return fmt.Errorf("Variable: '%v' not declared", node.Data)
 }
 
-func genDefaultExit(asmFile *os.File) {
-	asmFile.WriteString("\tmov rax, 60\n")
-	asmFile.WriteString("\tmov rdi, 0\n")
+func genDefaultExit(asmFile *os.File, genData *GeneratorData) error {
+	err := move(RAX, OpCode(60), genData)
+	err = move(RDI, OpCode(0), genData)
+	if err != nil {
+		return err
+	}
+
 	asmFile.WriteString("\tsyscall\n")
 
+	return nil
 }
 
 func prepBinaryExpressionCall(node parser.ASTNode, genData *GeneratorData) error {
 	var err error
 	if node.Children[0].IsOperator() {
-		err = pop("rax", node.Type, genData)
+		err = pop(RAX, node.Type, genData)
 	} else if node.Children[0].Kind == parser.Term {
-		_, err = genData.asmFile.WriteString("\tmov rax, " + node.Children[0].Data + "\n")
+		err = genTerm(RAX, node.Children[0], genData)
 	} else if node.Children[0].Kind == parser.Identifier {
 		err = genIdentifier(node.Children[0], genData)
-		err = pop("rax", node.Children[0].Type, genData)
+		err = pop(RAX, node.Children[0].Type, genData)
 	}
 
 	if node.Children[1].IsOperator() {
-		err = pop("rbx", node.Type, genData)
+		err = pop(RBX, node.Type, genData)
 	} else if node.Children[1].Kind == parser.Term {
-		_, err = genData.asmFile.WriteString("\tmov rbx, " + node.Children[1].Data + "\n")
+		err = genTerm(RBX, node.Children[1], genData)
 	} else if node.Children[1].Kind == parser.Identifier {
 		err = genIdentifier(node.Children[1], genData)
-		err = pop("rbx", node.Children[1].Type, genData)
+		err = pop(RBX, node.Children[1].Type, genData)
 	}
 
 	return err
 }
 
-func move(from string, to string, genData *GeneratorData) error {
-	_, err := genData.asmFile.WriteString("\tmov " + from + ", " + to + "\n")
+func move[T1 movable, T2 movable](to T1, from T2, genData *GeneratorData) error {
+	_, err := genData.asmFile.WriteString("\tmov " + to.String() + ", " + from.String() + "\n")
+
 	if err != nil {
 		return err
 	}
@@ -254,8 +352,9 @@ func move(from string, to string, genData *GeneratorData) error {
 	return nil
 }
 
-func push(register string, dataType semantics.Type, genData *GeneratorData) error {
-	_, err := genData.asmFile.WriteString("\tpush " + register + "\t\t\t" + ";; Stack position: " + strconv.Itoa(genData.stackPtrLocation) + "\n")
+func push[T pushable](val T, dataType semantics.Type, genData *GeneratorData) error {
+	_, err := genData.asmFile.WriteString("\tpush " + val.String() + "\t\t\t" + ";; Stack position: " + strconv.Itoa(genData.stackPtrLocation) + "\n")
+
 	if err != nil {
 		return err
 	}
@@ -265,8 +364,8 @@ func push(register string, dataType semantics.Type, genData *GeneratorData) erro
 	return nil
 }
 
-func pop(register string, dataType semantics.Type, genData *GeneratorData) error {
-	_, err := genData.asmFile.WriteString("\tpop " + register + "\n")
+func pop(register Register, dataType semantics.Type, genData *GeneratorData) error {
+	_, err := genData.asmFile.WriteString("\tpop " + register.String() + "\n")
 	if err != nil {
 		return err
 	}
@@ -278,8 +377,15 @@ func pop(register string, dataType semantics.Type, genData *GeneratorData) error
 
 func reassign(ident parser.ASTNode, genData *GeneratorData) error {
 	variable := (*genData.vars)[ident.Data]
-	word := bytesToWord(variable.Type.Size())
-	genData.asmFile.WriteString("\tmov " + word + " [rsp + " + strconv.Itoa(8*(genData.stackPtrLocation-variable.StackLocation)) + "]" + ", rax\n")
+	offset := genData.stackPtrLocation - variable.StackLocation
+	var addr = StackAddress{
+		Register: RSP,
+		Offset:   offset,
+		Size:     bytesToWord(variable.Type.Size()),
+	}
+
+	move(addr, RAX, genData)
+
 	return nil
 }
 

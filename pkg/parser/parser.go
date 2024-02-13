@@ -73,14 +73,15 @@ func parseProgram(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (*ASTNod
 	for tokens.Len() > 1 {
 		if tokens.Top().Kind == tokenizer.CR {
 			tokens.Next()
-		}
+		} else {
 
-		stmt, err := parseStatement(tokens, vars)
-		if err != nil {
-			return nil, err
-		}
+			stmt, err := parseStatement(tokens, vars)
+			if err != nil {
+				return nil, err
+			}
 
-		prog.Children = append(prog.Children, stmt)
+			prog.Children = append(prog.Children, stmt)
+		}
 	}
 
 	return &prog, nil
@@ -123,7 +124,6 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 			}
 
 			tokens.Next()
-			tokens.Next()
 
 			stmt.Children = append(stmt.Children, *decl)
 			stmt.Children = append(stmt.Children, *expr)
@@ -151,7 +151,6 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 			}
 
 			tokens.Next()
-			tokens.Next()
 
 			stmt.Children = append(stmt.Children, *decl)
 			stmt.Children = append(stmt.Children, *expr)
@@ -178,7 +177,6 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 			}
 
 			tokens.Next()
-			tokens.Next()
 
 			stmt.Children = append(stmt.Children, *ident)
 			stmt.Children = append(stmt.Children, *expr)
@@ -186,18 +184,21 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 			return stmt, nil
 
 		} else if tokens.Peek(1).Kind == tokenizer.Operator_plusplus || tokens.Peek(1).Kind == tokenizer.Operator_minusminus {
-			var err error
-			stmt, err = parseStatementIncrement(tokens, vars)
+			stmt.Data = tokens.Peek(1).Data
+
+			expr, err := parseIncrement(tokens, vars)
 			if err != nil {
 				return ASTNode{}, err
 			}
+
+			stmt.Children = append(stmt.Children, expr)
 
 			return stmt, nil
 		} else {
 			return ASTNode{}, fmt.Errorf("Unrecognized operator after identifier '%v'", tokens.Top().Data)
 		}
 
-	} else if tokens.Top().Kind == tokenizer.Exit {
+	} else if tokens.Top().Kind == tokenizer.Exit || tokens.Top().Kind == tokenizer.Print {
 		stmt.Data = tokens.Top().Data
 
 		tokens.Next()
@@ -227,7 +228,7 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 	return ASTNode{}, fmt.Errorf("Unrecognized token: '%v' before: '%v'", tokens.Top().Data, tokens.Peek(1).Data)
 }
 
-func parseStatementIncrement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNode, error) {
+func parseIncrement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNode, error) {
 	lhs, err := parseTerm(tokens, vars)
 	if err != nil {
 		return ASTNode{}, err
@@ -253,17 +254,9 @@ func parseStatementIncrement(tokens *tokenizer.TokenStack, vars *semantics.VarMa
 	expr.Children = append(expr.Children, *lhs)
 	expr.Children = append(expr.Children, *rhs)
 
-	stmt := &ASTNode{
-		Kind: Statement,
-		Data: tokens.Top().Data,
-	}
-
-	stmt.Children = append(stmt.Children, *expr)
-
-	tokens.Next()
 	tokens.Next()
 
-	return *stmt, nil
+	return *expr, nil
 }
 
 func parseDeclaration(tokens *tokenizer.TokenStack, vars *semantics.VarMap, mutable bool) (*ASTNode, error) {

@@ -8,7 +8,8 @@ import (
 type Type int
 
 const (
-	Bool Type = iota + 0
+	Byte Type = iota + 0
+	Bool
 	Int
 	Char
 	Float
@@ -16,6 +17,7 @@ const (
 
 func (typ Type) String() string {
 	name := []string{
+		"Byte",
 		"Bool",
 		"Int",
 		"Char",

@@ -1,7 +1,5 @@
-mut int abcd = 11
-mut int rr = 4
-mut int c = 23
-abcd = rr + c
-abcd++
-abcd++
-exit(abcd)
+mut int a = 21
+
+
+print(a)
+
