@@ -23,6 +23,16 @@ func (i IntLiteral) String() string {
 	return strconv.Itoa(int(i)) + "h"
 }
 
+type CharLiteral string
+
+func (c CharLiteral) String() string {
+	if c == "\\n" {
+		return OpCode(10).String() // ascii value for CR
+	}
+
+	return "'" + string(c) + "'"
+}
+
 type Register int
 
 const (
@@ -68,7 +78,7 @@ func (sa StackAddress) String() string {
 }
 
 type movable interface {
-	IntLiteral | OpCode | Register | StackAddress
+	IntLiteral | CharLiteral | OpCode | Register | StackAddress
 	String() string
 }
 
@@ -134,7 +144,9 @@ func genStatement(node parser.ASTNode, genData *GeneratorData) error {
 	if node.Data == "=" {
 		if node.Children[0].Kind == parser.Declaration {
 			if variable, ok := (*genData.vars)[node.Children[0].Data]; ok {
-				node.Children[1].Type = node.Children[0].Type
+				if node.Children[1].Type == semantics.Untyped {
+					node.Children[1].Type = node.Children[0].Type
+				}
 
 				genAtom(node.Children[1], genData)
 				push(RAX, node.Children[0].Type, genData)
@@ -143,7 +155,9 @@ func genStatement(node parser.ASTNode, genData *GeneratorData) error {
 				return fmt.Errorf("Variable: '%v' already declared", node.Children[0].Data)
 			}
 		} else if node.Children[0].Kind == parser.Identifier && node.Children[0].Mutable == true {
-			node.Children[1].Type = node.Children[0].Type
+			if node.Children[1].Type == semantics.Untyped {
+				node.Children[1].Type = node.Children[0].Type
+			}
 			genAtom(node.Children[1], genData)
 			pop(RAX, node.Children[0].Type, genData)
 			reassign(node.Children[0], genData)
@@ -163,6 +177,11 @@ func genStatement(node parser.ASTNode, genData *GeneratorData) error {
 		}
 	} else if node.Data == "print" {
 		genAtom(node.Children[0], genData)
+
+		if node.Children[0].Type != semantics.Char {
+			return fmt.Errorf("print only implemented for char, attempted call with type %v", node.Type.String())
+		}
+
 		move(RAX, OpCode(1), genData)
 		move(RDI, OpCode(1), genData)
 		move(RSI, RSP, genData)
@@ -182,8 +201,10 @@ func genAtom(node parser.ASTNode, genData *GeneratorData) error {
 	var err error
 	if node.Kind == parser.Expression && len(node.Children) == 2 {
 		err = genExpression(node, genData)
+		push(RAX, node.Type, genData)
 	} else if node.Kind == parser.Term {
 		err = genTerm(RAX, node, genData)
+		push(RAX, node.Type, genData)
 	} else if node.Kind == parser.Identifier {
 		err = genIdentifier(node, genData)
 	}
@@ -276,6 +297,21 @@ func genBinaryExpression(node parser.ASTNode, genData *GeneratorData) error {
 }
 
 func genTerm(register Register, node parser.ASTNode, genData *GeneratorData) error {
+	var err error
+
+	switch node.Type {
+	case semantics.Int:
+		err = genIntLiteral(register, node, genData)
+		break
+	case semantics.Char:
+		err = genCharLiteral(register, node, genData)
+		break
+	}
+
+	return err
+}
+
+func genIntLiteral(register Register, node parser.ASTNode, genData *GeneratorData) error {
 	data, err := strconv.Atoi(node.Data)
 	if err != nil {
 		return err
@@ -287,6 +323,10 @@ func genTerm(register Register, node parser.ASTNode, genData *GeneratorData) err
 	}
 
 	return nil
+}
+
+func genCharLiteral(register Register, node parser.ASTNode, genData *GeneratorData) error {
+	return move(register, CharLiteral(node.Data[1:len(node.Data)-1]), genData)
 }
 
 func genIdentifier(node parser.ASTNode, genData *GeneratorData) error {

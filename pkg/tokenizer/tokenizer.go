@@ -23,6 +23,7 @@ const (
 	Operator_plusplus
 	Operator_minusminus
 	Int_literal
+	Char_literal
 	Mutable
 	Type
 	SingleEqual
@@ -43,6 +44,7 @@ func (tokenType TokenType) String() string {
 		"MinusMinus",
 		"PlusPlus",
 		"Int_Literal",
+		"Char_Literal",
 		"Mutable",
 		"Type",
 		"Equal",
@@ -74,6 +76,7 @@ var TokenDict = map[string]TokenType{
 	"mut":   Mutable,
 	"const": Mutable,
 	"int":   Type,
+	"char":  Type,
 	"=":     SingleEqual,
 }
 
@@ -178,6 +181,14 @@ func Tokenize(raw []byte) TokenStack {
 			result = result.Append("--")
 			last = i + 2
 			i = i + 1
+		} else if curr == '\'' {
+			result = result.Append(buf)
+			i++
+			curr = view(fileContents, i)
+			for curr != '\'' {
+				i++
+				curr = view(fileContents, i)
+			}
 		} else if curr == '(' {
 			result = result.Append(buf)
 			result = result.Append("(")
@@ -200,8 +211,7 @@ func Tokenize(raw []byte) TokenStack {
 }
 
 func matchToken(tokenAsString string) (TokenType, error) {
-	result, found := TokenDict[tokenAsString]
-	if found {
+	if result, found := TokenDict[tokenAsString]; found {
 		return result, nil
 	} else if tokenAsString != "" && unicode.IsDigit(rune(tokenAsString[0])) {
 		_, err := strconv.Atoi(tokenAsString)
@@ -209,6 +219,8 @@ func matchToken(tokenAsString string) (TokenType, error) {
 			panic(err)
 		}
 		return Int_literal, nil
+	} else if tokenAsString != "" && isCharConstant(tokenAsString) {
+		return Char_literal, nil
 	} else if isAlphabetic(tokenAsString) {
 		return Identifier, nil
 	} else {
@@ -224,6 +236,14 @@ func isAlphabetic(str string) bool {
 	}
 
 	return true
+}
+
+func isCharConstant(str string) bool {
+	if str[0] == '\'' && str[len(str)-1] == '\'' {
+		return true
+	}
+
+	return false
 }
 
 func view(str string, pos int) rune {

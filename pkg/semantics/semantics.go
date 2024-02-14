@@ -8,7 +8,8 @@ import (
 type Type int
 
 const (
-	Byte Type = iota + 0
+	Untyped Type = iota + 0
+	Byte
 	Bool
 	Int
 	Char
@@ -17,6 +18,7 @@ const (
 
 func (typ Type) String() string {
 	name := []string{
+		"Untyped",
 		"Byte",
 		"Bool",
 		"Int",
@@ -62,6 +64,8 @@ func MatchType(str string) (Type, error) {
 	switch {
 	case str == "int":
 		return Int, nil
+	case str == "char":
+		return Char, nil
 	default:
 		return -1, fmt.Errorf("Type %v not implemented", str)
 	}

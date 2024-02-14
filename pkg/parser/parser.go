@@ -123,6 +123,10 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 				return ASTNode{}, err
 			}
 
+			if decl.Type != expr.Type {
+				return ASTNode{}, fmt.Errorf("Attempted to assign expression (type: %v) to '%v' (type: %v)", expr.Type.String(), decl.Data, decl.Type.String())
+			}
+
 			tokens.Next()
 
 			stmt.Children = append(stmt.Children, *decl)
@@ -150,6 +154,10 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 				return ASTNode{}, err
 			}
 
+			if decl.Type != expr.Type {
+				return ASTNode{}, fmt.Errorf("Attempted to assign expression (type: %v) to '%v' (type: %v)", expr.Type.String(), decl.Data, decl.Type.String())
+			}
+
 			tokens.Next()
 
 			stmt.Children = append(stmt.Children, *decl)
@@ -174,6 +182,10 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 			expr, err := parseExpression(tokens, 0, vars)
 			if err != nil {
 				return ASTNode{}, err
+			}
+
+			if ident.Type != expr.Type {
+				return ASTNode{}, fmt.Errorf("Attempted to assign expression (type: %v) to '%v' (type: %v)", expr.Type.String(), ident.Data, ident.Type.String())
 			}
 
 			tokens.Next()
@@ -321,6 +333,7 @@ func parseExpression(tokens *tokenizer.TokenStack, minPrec int, vars *semantics.
 		}
 		expr.Children[0] = *lhs
 		expr.Children[1] = *rhs
+		expr.Type = lhs.Type
 
 		lookahead = tokens.Peek(1)
 
@@ -337,6 +350,13 @@ func parseTerm(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (*ASTNode, 
 		return &ASTNode{
 			Kind: Term,
 			Data: tokens.Top().Data,
+			Type: semantics.Int,
+		}, nil
+	} else if tokens.Top().Kind == tokenizer.Char_literal {
+		return &ASTNode{
+			Kind: Term,
+			Data: tokens.Top().Data,
+			Type: semantics.Char,
 		}, nil
 	} else if tokens.Top().Kind == tokenizer.Identifier {
 		variable, ok := (*vars)[tokens.Top().Data]

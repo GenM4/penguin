@@ -1,5 +1,12 @@
-mut int a = 51
+mut char a = 'C'
 
+
+print('H')
+print('e')
+print('l')
+print(' ')
+print('l')
+print('o')
+print('\n')
 
 print(a)
-
