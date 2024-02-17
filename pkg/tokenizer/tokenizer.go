@@ -17,6 +17,7 @@ const (
 	Close_curl
 	Open_paren
 	Close_paren
+	Comma
 	CR
 	Operator_plus
 	Operator_minus
@@ -40,6 +41,7 @@ func (tokenType TokenType) String() string {
 		"Close_curl",
 		"Open_paren",
 		"Close_paren",
+		"Comma",
 		"CR",
 		"Plus",
 		"Minus",
@@ -72,6 +74,7 @@ var TokenDict = map[string]TokenType{
 	"}":     Close_curl,
 	"(":     Open_paren,
 	")":     Close_paren,
+	",":     Comma,
 	"\n":    CR,
 	"+":     Operator_plus,
 	"-":     Operator_minus,

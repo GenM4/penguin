@@ -134,7 +134,7 @@ func genProgram(node parser.ASTNode, genData *GeneratorData) error {
 				return err
 			}
 		} else {
-			return fmt.Errorf("AST Node '%v'", node.Kind.String())
+			return fmt.Errorf("Unexpected %v in %v", child.Kind.String(), node.Kind.String())
 		}
 	}
 	return nil

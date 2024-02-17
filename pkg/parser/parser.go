@@ -12,6 +12,7 @@ type ASTNodeType int
 
 const (
 	Program ASTNodeType = iota + 0
+	Scope
 	Statement
 	Declaration
 	Expression
@@ -32,6 +33,7 @@ type ASTNode struct {
 func (nodeType ASTNodeType) String() string {
 	name := []string{
 		"Program",
+		"Scope",
 		"Statement",
 		"Declaration",
 		"Expression",
@@ -95,22 +97,25 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 	if tokens.Top().Kind == tokenizer.Mutable && tokens.Peek(1).Kind == tokenizer.Type {
 		if tokens.Peek(3).Kind == tokenizer.SingleEqual {
 			stmt, err := parseAssignment(true, false, tokens, vars)
-
+			return *stmt, err
+		} else {
+			stmt, err := parseDeclaration(true, tokens, vars)
+			tokens.Next()
 			return *stmt, err
 		}
 	} else if tokens.Top().Kind == tokenizer.Type {
 		if tokens.Peek(2).Kind == tokenizer.SingleEqual {
 			stmt, err := parseAssignment(false, false, tokens, vars)
-
+			return *stmt, err
+		} else {
+			stmt, err := parseDeclaration(true, tokens, vars)
+			tokens.Next()
 			return *stmt, err
 		}
-
 	} else if tokens.Top().Kind == tokenizer.Identifier {
 		if tokens.Peek(1).Kind == tokenizer.SingleEqual {
 			stmt, err := parseAssignment(true, true, tokens, vars)
-
 			return *stmt, err
-
 		} else if tokens.Peek(1).Kind == tokenizer.Operator_plusplus || tokens.Peek(1).Kind == tokenizer.Operator_minusminus {
 			stmt.Data = tokens.Peek(1).Data
 
@@ -170,7 +175,7 @@ func parseAssignment(hasMutable bool, isDeclared bool, tokens *tokenizer.TokenSt
 			return &ASTNode{}, fmt.Errorf("Attempt to write to immutable value '%v'", lhs.Data)
 		}
 	} else {
-		lhs, err = parseDeclaration(tokens, vars, hasMutable)
+		lhs, err = parseDeclaration(hasMutable, tokens, vars)
 	}
 
 	tokens.Next()
@@ -193,38 +198,7 @@ func parseAssignment(hasMutable bool, isDeclared bool, tokens *tokenizer.TokenSt
 	return assignment, nil
 }
 
-func parseIncrement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNode, error) {
-	lhs, err := parseTerm(tokens, vars)
-	if err != nil {
-		return ASTNode{}, err
-	}
-
-	if lhs.Type != semantics.Int {
-		return ASTNode{}, fmt.Errorf("Increment/Decrement operator not implemented for type %v", lhs.Type.String())
-	}
-
-	rhs := &ASTNode{
-		Kind: Term,
-		Data: "1",
-	}
-
-	tokens.Next()
-
-	expr := &ASTNode{
-		Kind:       Expression,
-		Precedence: 2,
-		Data:       string(tokens.Top().Data[1]),
-	}
-
-	expr.Children = append(expr.Children, *lhs)
-	expr.Children = append(expr.Children, *rhs)
-
-	tokens.Next()
-
-	return *expr, nil
-}
-
-func parseDeclaration(tokens *tokenizer.TokenStack, vars *semantics.VarMap, hasMutable bool) (*ASTNode, error) {
+func parseDeclaration(hasMutable bool, tokens *tokenizer.TokenStack, vars *semantics.VarMap) (*ASTNode, error) {
 	decl := &ASTNode{
 		Kind: Declaration,
 	}
@@ -252,7 +226,105 @@ func parseDeclaration(tokens *tokenizer.TokenStack, vars *semantics.VarMap, hasM
 	decl.Data = tokens.Top().Data
 	(*vars)[decl.Data] = &semantics.Variable{Mutable: decl.Mutable, Type: decl.Type, StackLocation: 0}
 
+	if tokens.Peek(1).Kind == tokenizer.Open_paren {
+		tokens.Next()
+		tokens.Next()
+
+		args, err := parseArgs(tokens, vars)
+		if err != nil {
+			return &ASTNode{}, err
+		}
+		decl.Children = append(decl.Children, args...)
+
+		if tokens.Top().Kind != tokenizer.Open_curl {
+			tokens.Next()
+		}
+		tokens.Next()
+
+		scope, err := parseScope(tokens, vars)
+		if err != nil {
+			return &ASTNode{}, err
+		}
+		scope.Parent = decl
+		decl.Children = append(decl.Children, scope)
+	}
+
 	return decl, nil
+}
+
+func parseArgs(tokens *tokenizer.TokenStack, vars *semantics.VarMap) ([]ASTNode, error) {
+	var args []ASTNode
+	for tokens.Top().Kind != tokenizer.Close_paren {
+		ident, err := parseDeclaration(tokens.Top().Kind == tokenizer.Mutable, tokens, vars)
+
+		if err != nil {
+			return []ASTNode{}, err
+		}
+
+		args = append(args, *ident)
+
+		tokens.Next()
+
+		if tokens.Top().Kind == tokenizer.Comma {
+			tokens.Next()
+		}
+	}
+
+	return args, nil
+}
+
+func parseScope(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNode, error) {
+	var scope = &ASTNode{
+		Kind: Scope,
+	}
+
+	for tokens.Top().Kind != tokenizer.Close_curl {
+		if tokens.Top().Kind == tokenizer.CR {
+			tokens.Next()
+		} else {
+
+			stmt, err := parseStatement(tokens, vars)
+			if err != nil {
+				return ASTNode{}, err
+			}
+
+			scope.Children = append(scope.Children, stmt)
+		}
+	}
+
+	return *scope, nil
+}
+
+func parseIncrement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNode, error) {
+	lhs, err := parseTerm(tokens, vars)
+	if err != nil {
+		return ASTNode{}, err
+	}
+
+	if lhs.Type != semantics.Int {
+		return ASTNode{}, fmt.Errorf("Increment/Decrement operator not implemented for type %v", lhs.Type.String())
+	}
+
+	rhs := &ASTNode{
+		Kind: Term,
+		Data: "1",
+		Type: semantics.Int,
+	}
+
+	tokens.Next()
+
+	expr := &ASTNode{
+		Kind:       Expression,
+		Precedence: 2,
+		Data:       string(tokens.Top().Data[1]),
+	}
+
+	expr.Children = append(expr.Children, *lhs)
+	expr.Children = append(expr.Children, *rhs)
+
+	tokens.Next()
+
+	return *expr, nil
 }
 
 func parseExpression(tokens *tokenizer.TokenStack, minPrec int, vars *semantics.VarMap) (*ASTNode, error) {

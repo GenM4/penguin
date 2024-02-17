@@ -1,11 +1,14 @@
-mut char a = 'C'
-const char b = 'b'
-char c = 'c'
+mut char f(int c) {
+    print(c)
 
-a = 'e'
+    c++
+
+    mut int f = c + 2
+}
 
 
-//print('H')
+
+print('H')
 //print('e')
 //print('l')
 //print(' ')

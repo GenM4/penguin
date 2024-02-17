@@ -117,50 +117,44 @@ func printTokens(tokens tokenizer.TokenStack, printKinds bool) {
 }
 
 func printAST(ASTRoot *parser.ASTNode) {
-	t := tree.NewTree(tree.NodeString("Prog: " + ASTRoot.Data))
-	for _, stmt := range ASTRoot.Children {
-		stmtNode := t.AddChild(tree.NodeString("Stmt: " + stmt.Data))
-		for _, expr := range stmt.Children {
-			var exprNode *tree.Tree
-			if expr.Kind == parser.Declaration {
-				exprNode = stmtNode.AddChild(tree.NodeString(expr.Kind.String() + ": " + expr.Data + "\n" + "Mutable: " + strconv.FormatBool(expr.Mutable) + "\n" + "Type: " + expr.Type.String()))
-			} else {
-				exprNode = stmtNode.AddChild(tree.NodeString(expr.Kind.String() + ": " + expr.Data + "\n" + "Type: " + expr.Type.String() + "\n" + "Prec: " + strconv.Itoa(expr.Precedence)))
-			}
-			for _, term := range expr.Children {
-				var termNode *tree.Tree
-				if term.Precedence != -1 {
-					termNode = exprNode.AddChild(tree.NodeString(term.Kind.String() + ": " + term.Data + "\n" + "Type: " + term.Type.String() + "\n" + "Prec: " + strconv.Itoa(term.Precedence)))
-				} else {
-					termNode = exprNode.AddChild(tree.NodeString(term.Data))
-				}
-				for _, term2 := range term.Children {
-					var term2Node *tree.Tree
-					if term2.Precedence != -1 {
-						term2Node = termNode.AddChild(tree.NodeString(term2.Kind.String() + ": " + term2.Data + "\n" + "Type: " + term.Type.String() + "\n" + "Prec: " + strconv.Itoa(term2.Precedence)))
-					} else {
-						term2Node = termNode.AddChild(tree.NodeString(term2.Data))
-					}
-					for _, term3 := range term2.Children {
-						var term3Node *tree.Tree
-						if term3.Precedence != -1 {
-							term3Node = term2Node.AddChild(tree.NodeString(term3.Kind.String() + ": " + term3.Data + "\n" + "Type: " + term.Type.String() + "\n" + "Prec: " + strconv.Itoa(term3.Precedence)))
-						} else {
-							term3Node = term2Node.AddChild(tree.NodeString(term3.Data))
-						}
-						for _, term4 := range term3.Children {
-							if term4.Precedence != -1 {
-								term3Node.AddChild(tree.NodeString(term4.Kind.String() + ": " + term4.Data + "\n" + "Type: " + term.Type.String() + "\n" + "Prec: " + strconv.Itoa(term4.Precedence)))
-							} else {
-								term3Node.AddChild(tree.NodeString(term4.Data))
-							}
-						}
+	t := tree.NewTree(tree.NodeString(formatASTNode(*ASTRoot)))
+	for _, l1Node := range ASTRoot.Children {
+		l1TreeNode := t.AddChild(tree.NodeString(formatASTNode(l1Node)))
+		for _, l2Node := range l1Node.Children {
+			l2TreeNode := l1TreeNode.AddChild(tree.NodeString(formatASTNode(l2Node)))
+			for _, l3Node := range l2Node.Children {
+				l3TreeNode := l2TreeNode.AddChild(tree.NodeString(formatASTNode(l3Node)))
+				for _, l4Node := range l3Node.Children {
+					l4TreeNode := l3TreeNode.AddChild(tree.NodeString(formatASTNode(l4Node)))
+					for _, l5Node := range l4Node.Children {
+						l4TreeNode.AddChild(tree.NodeString(formatASTNode(l5Node)))
 					}
 				}
 			}
 		}
 	}
 	fmt.Println(t)
+}
+
+func formatASTNode(node parser.ASTNode) string {
+	switch node.Kind {
+	case parser.Program:
+		return node.Kind.String() + ": " + node.Data
+	case parser.Declaration:
+		return node.Kind.String() + ": " + node.Data + "\n" + "Mutable: " + strconv.FormatBool(node.Mutable) + "\n" + "Type: " + node.Type.String()
+	case parser.Scope:
+		return node.Kind.String() + ": " + "'" + node.Parent.Data + "'"
+	case parser.Statement:
+		return node.Kind.String() + ": " + node.Data
+	case parser.Expression:
+		return node.Kind.String() + ": " + node.Data + "\n" + "Prec: " + strconv.Itoa(node.Precedence)
+	case parser.Identifier:
+		return node.Kind.String() + ": " + node.Data + "\n" + "Type: " + node.Type.String() + "\n" + "Prec: " + strconv.Itoa(node.Precedence)
+	case parser.Term:
+		return node.Kind.String() + ": " + node.Data + "\n" + "Type: " + node.Type.String() + "\n" + "Prec: " + strconv.Itoa(node.Precedence)
+	default:
+		return node.Kind.String() + ": " + node.Data + "\n" + "Type: " + node.Type.String() + "\n"
+	}
 }
 
 func printVarMap(vars *semantics.VarMap) {
