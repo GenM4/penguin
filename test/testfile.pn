@@ -1,12 +1,16 @@
 mut char a = 'C'
+const char b = 'b'
+char c = 'c'
+
+a = 'e'
 
 
-print('H')
-print('e')
-print('l')
-print(' ')
-print('l')
-print('o')
-print('\n')
+//print('H')
+//print('e')
+//print('l')
+//print(' ')
+//print('l')
+//print('o')
+//print('\n')
 
-print(a)
+//print(a)

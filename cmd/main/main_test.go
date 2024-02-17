@@ -29,7 +29,7 @@ func ExecuteProgram(t *testing.T) {
 	if err != nil {
 		t.Errorf("Program exited with %v, expected %v", err, *expected)
 	} else {
-		log.Print(string(out))
+		log.Print("PROGRAM OUTPUT: " + "\n\n" + string(out) + "\n\n")
 	}
 
 }

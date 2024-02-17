@@ -94,106 +94,22 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 
 	if tokens.Top().Kind == tokenizer.Mutable && tokens.Peek(1).Kind == tokenizer.Type {
 		if tokens.Peek(3).Kind == tokenizer.SingleEqual {
-			stmt.Data = tokens.Peek(3).Data
+			stmt, err := parseAssignment(true, false, tokens, vars)
 
-			var decl *ASTNode
-			var err error
-
-			if tokens.Top().Data == "mut" {
-				tokens.Next()
-				decl, err = parseDeclaration(tokens, vars, true)
-				if err != nil {
-					return ASTNode{}, nil
-				}
-			} else if tokens.Top().Data == "const" {
-				tokens.Next()
-				decl, err = parseDeclaration(tokens, vars, false)
-				if err != nil {
-					return ASTNode{}, nil
-				}
-			} else {
-				return ASTNode{}, fmt.Errorf("Unrecognized keyword: '%v' before '%v'", tokens.Top().Data, tokens.Next().Data)
-			}
-
-			tokens.Next()
-			tokens.Next()
-
-			expr, err := parseExpression(tokens, 0, vars)
-			if err != nil {
-				return ASTNode{}, err
-			}
-
-			if decl.Type != expr.Type {
-				return ASTNode{}, fmt.Errorf("Attempted to assign expression (type: %v) to '%v' (type: %v)", expr.Type.String(), decl.Data, decl.Type.String())
-			}
-
-			tokens.Next()
-
-			stmt.Children = append(stmt.Children, *decl)
-			stmt.Children = append(stmt.Children, *expr)
-
-			return stmt, nil
+			return *stmt, err
 		}
 	} else if tokens.Top().Kind == tokenizer.Type {
 		if tokens.Peek(2).Kind == tokenizer.SingleEqual {
-			stmt.Data = tokens.Peek(2).Data
+			stmt, err := parseAssignment(false, false, tokens, vars)
 
-			var decl *ASTNode
-			var err error
-
-			decl, err = parseDeclaration(tokens, vars, false)
-			if err != nil {
-				return ASTNode{}, nil
-			}
-
-			tokens.Next()
-			tokens.Next()
-
-			expr, err := parseExpression(tokens, 0, vars)
-			if err != nil {
-				return ASTNode{}, err
-			}
-
-			if decl.Type != expr.Type {
-				return ASTNode{}, fmt.Errorf("Attempted to assign expression (type: %v) to '%v' (type: %v)", expr.Type.String(), decl.Data, decl.Type.String())
-			}
-
-			tokens.Next()
-
-			stmt.Children = append(stmt.Children, *decl)
-			stmt.Children = append(stmt.Children, *expr)
-
-			return stmt, nil
+			return *stmt, err
 		}
 
 	} else if tokens.Top().Kind == tokenizer.Identifier {
 		if tokens.Peek(1).Kind == tokenizer.SingleEqual {
-			stmt.Data = tokens.Peek(1).Data
+			stmt, err := parseAssignment(true, true, tokens, vars)
 
-			ident, err := parseTerm(tokens, vars)
-
-			if ident.Mutable != true {
-				return ASTNode{}, fmt.Errorf("Attempt to write to immutable value '%v'", tokens.Top().Data)
-			}
-
-			tokens.Next()
-			tokens.Next()
-
-			expr, err := parseExpression(tokens, 0, vars)
-			if err != nil {
-				return ASTNode{}, err
-			}
-
-			if ident.Type != expr.Type {
-				return ASTNode{}, fmt.Errorf("Attempted to assign expression (type: %v) to '%v' (type: %v)", expr.Type.String(), ident.Data, ident.Type.String())
-			}
-
-			tokens.Next()
-
-			stmt.Children = append(stmt.Children, *ident)
-			stmt.Children = append(stmt.Children, *expr)
-
-			return stmt, nil
+			return *stmt, err
 
 		} else if tokens.Peek(1).Kind == tokenizer.Operator_plusplus || tokens.Peek(1).Kind == tokenizer.Operator_minusminus {
 			stmt.Data = tokens.Peek(1).Data
@@ -240,6 +156,43 @@ func parseStatement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 	return ASTNode{}, fmt.Errorf("Unrecognized token: '%v' before: '%v'", tokens.Top().Data, tokens.Peek(1).Data)
 }
 
+func parseAssignment(hasMutable bool, isDeclared bool, tokens *tokenizer.TokenStack, vars *semantics.VarMap) (*ASTNode, error) {
+	assignment := &ASTNode{
+		Data: "=",
+		Kind: Statement,
+	}
+
+	var err error
+	var lhs *ASTNode
+	if isDeclared {
+		lhs, err = parseTerm(tokens, vars)
+		if lhs.Mutable != true {
+			return &ASTNode{}, fmt.Errorf("Attempt to write to immutable value '%v'", lhs.Data)
+		}
+	} else {
+		lhs, err = parseDeclaration(tokens, vars, hasMutable)
+	}
+
+	tokens.Next()
+	tokens.Next()
+
+	expr, err := parseExpression(tokens, 0, vars)
+	if err != nil {
+		return &ASTNode{}, err
+	}
+
+	if lhs.Type != expr.Type {
+		return &ASTNode{}, fmt.Errorf("Attempted to assign expression (type: %v) to '%v' (type: %v)", expr.Type.String(), lhs.Data, lhs.Type.String())
+	}
+
+	tokens.Next()
+
+	assignment.Children = append(assignment.Children, *lhs)
+	assignment.Children = append(assignment.Children, *expr)
+
+	return assignment, nil
+}
+
 func parseIncrement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNode, error) {
 	lhs, err := parseTerm(tokens, vars)
 	if err != nil {
@@ -271,10 +224,21 @@ func parseIncrement(tokens *tokenizer.TokenStack, vars *semantics.VarMap) (ASTNo
 	return *expr, nil
 }
 
-func parseDeclaration(tokens *tokenizer.TokenStack, vars *semantics.VarMap, mutable bool) (*ASTNode, error) {
-	decl := ASTNode{
-		Kind:    Declaration,
-		Mutable: mutable,
+func parseDeclaration(tokens *tokenizer.TokenStack, vars *semantics.VarMap, hasMutable bool) (*ASTNode, error) {
+	decl := &ASTNode{
+		Kind: Declaration,
+	}
+
+	if hasMutable && tokens.Top().Data == "mut" {
+		tokens.Next()
+		decl.Mutable = true
+	} else if hasMutable && tokens.Top().Data == "const" {
+		tokens.Next()
+		decl.Mutable = false
+	} else if hasMutable {
+		return &ASTNode{}, fmt.Errorf("Unrecognized keyword: '%v' before '%v'", tokens.Top().Data, tokens.Next().Data)
+	} else {
+		decl.Mutable = false
 	}
 
 	var err error
@@ -288,7 +252,7 @@ func parseDeclaration(tokens *tokenizer.TokenStack, vars *semantics.VarMap, muta
 	decl.Data = tokens.Top().Data
 	(*vars)[decl.Data] = &semantics.Variable{Mutable: decl.Mutable, Type: decl.Type, StackLocation: 0}
 
-	return &decl, nil
+	return decl, nil
 }
 
 func parseExpression(tokens *tokenizer.TokenStack, minPrec int, vars *semantics.VarMap) (*ASTNode, error) {

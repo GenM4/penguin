@@ -1,17 +1,19 @@
+statement -> declaration
+statement -> [...type]...identifier = identifier([...type]...atom)
 statement -> identifier = atom
 statement -> identifier idOp
-statement -> exit(atom)
 
-atom -> { identifer, expr, term}
-
+declaration -> mutable type identifier(...) scope
 declaration -> mutable type identifier
 
-expr -> term operator term
+expr -> atom operator atom
+
+atom -> {identifer, expr, term}
 
 term -> literal
 
-type -> {int}
+type -> {int, char}
 mutable -> {mut, const}
-operator -> {+, -, *, /, idOp}
+operator -> {+, -, *, /}
 idOp -> {++, --}
 
