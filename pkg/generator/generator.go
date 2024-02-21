@@ -331,26 +331,24 @@ func genAtom(to Register, node parser.ASTNode, genData *GeneratorData) error {
 
 func genCall(to Register, function *semantics.Function, node parser.ASTNode, genData *GeneratorData) error {
 	if node.Data == "print" {
-		genAtom(RAX, node.Children[0], genData)
-
 		if node.Children[0].Type != semantics.Char {
 			return fmt.Errorf("print only implemented for char, attempted call with type %v", node.Type.String())
 		}
+
+		genAtom(RAX, node.Children[0], genData)
+		push(RAX, genData)
 
 		move(RAX, OpCode(1), genData)
 		move(RDI, OpCode(1), genData)
 		move(RSI, RSP, genData)
 		move(RDX, OpCode(1), genData)
 		genData.asmFile.WriteString("\tsyscall\n")
+		pop(RAX, genData)
 	} else if node.Data == "exit" {
 		genAtom(RDI, node.Children[0], genData)
 		move(RAX, OpCode(60), genData)
 		genData.asmFile.WriteString("\tsyscall\n")
 	} else {
-		if function.NumArgs > 0 {
-			//			genData.asmFile.WriteString("\tsub rsp, " + strconv.Itoa(function.NumArgs*16) + "\n")
-		}
-
 		for i := 0; i < function.NumArgs; i++ {
 			err := genAtom(RAX, node.Children[i], genData)
 			if err != nil {
@@ -484,7 +482,6 @@ func genCharLiteral(register Register, node parser.ASTNode, genData *GeneratorDa
 
 func genIdentifier(to Register, node parser.ASTNode, genData *GeneratorData) error {
 	if variable, ok := (*genData.vars)[node.Data]; ok {
-		fmt.Println(variable.StackLocation)
 		offset := variable.StackLocation
 		var addr = StackAddress{
 			Offset:   offset,

@@ -1,21 +1,13 @@
-mut int f(int c) {
-    int num = 3
-    return c + num + 5
+mut int f(int c, int d, int e) {
+    return c * d * e
 }
 
 int main() {
-    mut int elf = 5
-    mut int fle = f(elf + 5)
+    mut int fle = f(2,3,4)
+    mut int x = fle - 2
 
-    exit(fle)
+    print('H')
+    exit(0)
+    exit(x)
 }
 
-print('H')
-//print('e')
-//print('l')
-//print(' ')
-//print('l')
-//print('o')
-//print('\n')
-
-//print(a)
