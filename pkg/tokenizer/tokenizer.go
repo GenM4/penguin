@@ -11,13 +11,13 @@ import (
 type TokenType int
 
 const (
-	Exit TokenType = iota + 0
-	Print
+	Std_Function TokenType = iota + 0
 	Open_curl
 	Close_curl
 	Open_paren
 	Close_paren
 	Comma
+	Return
 	CR
 	Operator_plus
 	Operator_minus
@@ -35,13 +35,13 @@ const (
 
 func (tokenType TokenType) String() string {
 	name := []string{
-		"Exit",
-		"Print",
+		"Std_Function",
 		"Open_curl",
 		"Close_curl",
 		"Open_paren",
 		"Close_paren",
 		"Comma",
+		"Return",
 		"CR",
 		"Plus",
 		"Minus",
@@ -68,25 +68,31 @@ func (tokenType TokenType) String() string {
 }
 
 var TokenDict = map[string]TokenType{
-	"exit":  Exit,
-	"print": Print,
-	"{":     Open_curl,
-	"}":     Close_curl,
-	"(":     Open_paren,
-	")":     Close_paren,
-	",":     Comma,
-	"\n":    CR,
-	"+":     Operator_plus,
-	"-":     Operator_minus,
-	"*":     Operator_star,
-	"/":     Operator_slash,
-	"++":    Operator_plusplus,
-	"--":    Operator_minusminus,
-	"mut":   Mutable,
-	"const": Mutable,
-	"int":   Type,
-	"char":  Type,
-	"=":     SingleEqual,
+	"{":      Open_curl,
+	"}":      Close_curl,
+	"(":      Open_paren,
+	")":      Close_paren,
+	",":      Comma,
+	"return": Return,
+	"\n":     CR,
+	"+":      Operator_plus,
+	"-":      Operator_minus,
+	"*":      Operator_star,
+	"/":      Operator_slash,
+	"++":     Operator_plusplus,
+	"--":     Operator_minusminus,
+	"mut":    Mutable,
+	"const":  Mutable,
+	"int":    Type,
+	"char":   Type,
+	"=":      SingleEqual,
+}
+
+type StdLibFunction int
+
+var StdLibDict = map[string]string{
+	"exit":  "exit(int)",
+	"print": "print(char)",
 }
 
 type Token struct {
@@ -198,6 +204,10 @@ func Tokenize(raw []byte) TokenStack {
 				i++
 				curr = view(fileContents, i)
 			}
+		} else if curr == ',' {
+			result = result.Append(buf)
+			result = result.Append(",")
+			last = i + 1
 		} else if curr == '(' {
 			result = result.Append(buf)
 			result = result.Append("(")
@@ -222,6 +232,8 @@ func Tokenize(raw []byte) TokenStack {
 func matchToken(tokenAsString string) (TokenType, error) {
 	if result, found := TokenDict[tokenAsString]; found {
 		return result, nil
+	} else if _, found := StdLibDict[tokenAsString]; found {
+		return Std_Function, nil
 	} else if tokenAsString != "" && unicode.IsDigit(rune(tokenAsString[0])) {
 		_, err := strconv.Atoi(tokenAsString)
 		if err != nil {

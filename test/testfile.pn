@@ -1,12 +1,14 @@
-mut char f(int c) {
-    print(c)
-
-    c++
-
-    mut int f = c + 2
+mut int f(int c) {
+    int num = 3
+    return c + num + 5
 }
 
+int main() {
+    mut int elf = 5
+    mut int fle = f(elf + 5)
 
+    exit(fle)
+}
 
 print('H')
 //print('e')

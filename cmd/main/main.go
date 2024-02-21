@@ -23,16 +23,16 @@ func main() {
 	dat := ReadSourceFile(os.Args[1])
 	tokens := TokenizeFile(dat)
 
-	vars := make(semantics.VarMap)
+	vars, funcs := InitMaps()
 
-	ASTRoot := ParseTokens(tokens, &vars)
+	ASTRoot := ParseTokens(tokens, &vars, &funcs)
 
 	printVarMap(&vars)
 
 	fileData := files.GenerateFilepaths(os.Args)
 	asmFile := files.OpenTargetFile(fileData.AsmFilepath)
 
-	GenerateAssembly(ASTRoot, &vars, asmFile, fileData.AsmFilepath)
+	GenerateAssembly(ASTRoot, &vars, &funcs, asmFile, fileData.AsmFilepath)
 
 	Assemble(fileData)
 	Link(fileData)
@@ -63,16 +63,26 @@ func TokenizeFile(srcData []byte) tokenizer.TokenStack {
 	return tokens
 }
 
-func ParseTokens(tokens tokenizer.TokenStack, vars *semantics.VarMap) *parser.ASTNode {
-	ASTRoot := parser.Parse(&tokens, vars)
+func InitMaps() (semantics.VarMap, semantics.FuncMap) {
+	vars := make(semantics.VarMap)
+
+	funcs := make(semantics.FuncMap)
+	funcs["exit"] = &semantics.Function{Mutable: false, Type: semantics.Int, NumArgs: 1}
+	funcs["print"] = &semantics.Function{Mutable: false, Type: semantics.Char, NumArgs: 1}
+
+	return vars, funcs
+}
+
+func ParseTokens(tokens tokenizer.TokenStack, vars *semantics.VarMap, funcs *semantics.FuncMap) *parser.ASTNode {
+	ASTRoot := parser.Parse(&tokens, vars, funcs)
 	ASTRoot.Data = os.Args[1]
 	printAST(ASTRoot)
 
 	return ASTRoot
 }
 
-func GenerateAssembly(root *parser.ASTNode, vars *semantics.VarMap, file *os.File, filepath string) {
-	generator.Generate(root, vars, file)
+func GenerateAssembly(root *parser.ASTNode, vars *semantics.VarMap, funcs *semantics.FuncMap, file *os.File, filepath string) {
+	generator.Generate(root, vars, funcs, file)
 	log.Println("Completed generating assembly to " + filepath)
 
 }

@@ -56,9 +56,19 @@ type Variable struct {
 	Mutable       bool
 	Type          Type
 	StackLocation int
+	IsGlobal      bool
 }
 
 type VarMap map[string]*Variable
+
+type Function struct {
+	Mutable   bool
+	Type      Type
+	Signature string
+	NumArgs   int
+}
+
+type FuncMap map[string]*Function
 
 func MatchType(str string) (Type, error) {
 	switch {
